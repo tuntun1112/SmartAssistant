@@ -5,9 +5,10 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.portWin": "COM1",
+  "idf.portWin": "COM5",
   "idf.toolsPathWin": "C:\\Users\\tuntun\\.espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
-  }
+  },
+  "idf.flashType": "UART"
 }
