@@ -53,12 +53,13 @@ static esp_err_t init_display(void)
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = TFT_RST_PIN,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-        .bits_per_pixel = 18,  // SPI interface requires 18-bit
+        // SPI interface using RGB565
+        .bits_per_pixel = 16,
     };
     
-    // Calculate buffer size for SPI 18-bit color conversion (partial buffer)
+    // Calculate partial buffer size for RGB565 (16-bit) transfers
     // Use 1/16 of screen height for safer DMA memory allocation
-    size_t buffer_size = DISPLAY_WIDTH * (DISPLAY_HEIGHT / 16) * 3;  // ~28KB for partial buffering
+    size_t buffer_size = DISPLAY_WIDTH * (DISPLAY_HEIGHT / 16) * 2;
     
     ESP_ERROR_CHECK(esp_lcd_new_panel_ili9488(io_handle, &panel_config, buffer_size, &panel_handle));
     
