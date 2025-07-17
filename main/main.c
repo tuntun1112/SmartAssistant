@@ -17,8 +17,8 @@
 
 static const char *TAG = "SmartAssistant";
 
-static const int DISPLAY_HORIZONTAL_PIXELS = 320;
-static const int DISPLAY_VERTICAL_PIXELS = 480;
+static const int DISPLAY_HORIZONTAL_PIXELS = 480;
+static const int DISPLAY_VERTICAL_PIXELS = 320;
 static const int DISPLAY_COMMAND_BITS = 8;
 static const int DISPLAY_PARAMETER_BITS = 8;
 static const unsigned int DISPLAY_REFRESH_HZ = 40000000;
@@ -202,8 +202,8 @@ void initialize_display()
     ESP_ERROR_CHECK(esp_lcd_panel_reset(lcd_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_init(lcd_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(lcd_handle, false));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(lcd_handle, false));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(lcd_handle, true, false));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(lcd_handle, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(lcd_handle, false, true));
     ESP_ERROR_CHECK(esp_lcd_panel_set_gap(lcd_handle, 0, 0));
 #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
     ESP_ERROR_CHECK(esp_lcd_panel_disp_off(lcd_handle, false));
@@ -251,9 +251,10 @@ void create_boot_animation()
     lv_obj_add_style(lv_scr_act(), &style_screen, LV_STATE_DEFAULT);
 
     boot_label = lv_label_create(scr);
-    lv_label_set_text(boot_label, "Smartassistant\n\n...Starting");
+    lv_label_set_text(boot_label, "SmartAssistant\n\nStarting");
     lv_obj_set_style_text_color(boot_label, lv_color_white(), LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(boot_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(boot_label, LV_TEXT_ALIGN_CENTER, LV_STATE_DEFAULT);
     lv_obj_center(boot_label);
 
     ESP_LOGI(TAG, "Boot animation created");
