@@ -46,6 +46,12 @@
 - 微動感測器（如果實作重量太大可能會換成按壓力道需要較深的按鈕）
 
 
+##開發環境
+- Windows 11 Pro 24H2
+- Visual studio cuda
+- ESP-IDF v5.4
+
+
 ## 開發過程使用的AI工具
 ### 內嵌工具
 - Claude Code (MCP:Zen)
