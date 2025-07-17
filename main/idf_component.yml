@@ -1,0 +1,5 @@
+dependencies:
+  idf: ">=4.4.2"
+  lvgl/lvgl: "<9.0.0"
+  esp_lcd_ili9488:
+    git: https://github.com/atanisoft/esp_lcd_ili9488.git

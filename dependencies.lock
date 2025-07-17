@@ -1,0 +1,29 @@
+dependencies:
+  esp_lcd_ili9488:
+    component_hash: 3cdae0da82ebff20695cd0bdae4586f3941ce44ae0311e51687351f7c9790524
+    dependencies:
+    - name: idf
+      version: '>=4.4.2'
+    source:
+      git: https://github.com/atanisoft/esp_lcd_ili9488.git
+      path: .
+      type: git
+    version: 6577e7a0668cf1364b5eb1fc2115c9a367d3623e
+  idf:
+    source:
+      type: idf
+    version: 5.4.2
+  lvgl/lvgl:
+    component_hash: d7c1ac037ae6e85d94897f807d6e7ba0946a83e720074fc95a4f6241da9f9f53
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 8.4.0
+direct_dependencies:
+- esp_lcd_ili9488
+- idf
+- lvgl/lvgl
+manifest_hash: 41d4e4d73f29859587ab00c5b63fc373f804210893cabc71219cf106fc47d8ee
+target: esp32s3
+version: 2.0.0
