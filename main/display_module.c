@@ -59,9 +59,16 @@ static lv_color_t *lv_buf_2 = NULL;
 static lv_obj_t *boot_label = NULL;
 static lv_obj_t *boot_spinner = NULL;
 static lv_obj_t *boot_status_label = NULL;
+static lv_obj_t *boot_progress_bar = NULL;
+static lv_obj_t *boot_logo_container = NULL;
 static lv_obj_t *boot_screen = NULL;
 static lv_obj_t *main_screen = NULL;
 static lv_style_t style_screen;
+static lv_style_t style_card;
+static lv_style_t style_title;
+static lv_style_t style_status_panel;
+static lv_style_t style_progress_bar;
+static lv_style_t style_logo;
 static esp_timer_handle_t lvgl_tick_timer = NULL;
 
 // Forward declarations
@@ -75,6 +82,8 @@ static esp_err_t initialize_display(void);
 static esp_err_t initialize_lvgl(void);
 static void create_boot_animation(void);
 static void create_main_screen(void);
+static void init_styles(void);
+static void update_boot_progress(int progress);
 
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
     esp_lcd_panel_io_event_data_t *edata, void *user_ctx)
@@ -348,40 +357,132 @@ static esp_err_t initialize_lvgl(void)
     return ESP_OK;
 }
 
+static void init_styles(void)
+{
+    // Screen background style
+    lv_style_init(&style_screen);
+    lv_style_set_bg_color(&style_screen, lv_color_hex(0x0f0f23));
+    lv_style_set_bg_grad_color(&style_screen, lv_color_hex(0x1a1a3a));
+    lv_style_set_bg_grad_dir(&style_screen, LV_GRAD_DIR_VER);
+    
+    // Card style for containers
+    lv_style_init(&style_card);
+    lv_style_set_bg_color(&style_card, lv_color_hex(0x2d2d44));
+    lv_style_set_bg_opa(&style_card, LV_OPA_90);
+    lv_style_set_border_color(&style_card, lv_color_hex(0x4a4a6a));
+    lv_style_set_border_width(&style_card, 1);
+    lv_style_set_border_opa(&style_card, LV_OPA_50);
+    lv_style_set_radius(&style_card, 12);
+    lv_style_set_shadow_width(&style_card, 10);
+    lv_style_set_shadow_color(&style_card, lv_color_black());
+    lv_style_set_shadow_opa(&style_card, LV_OPA_30);
+    lv_style_set_pad_all(&style_card, 16);
+    
+    // Title style
+    lv_style_init(&style_title);
+    lv_style_set_text_color(&style_title, lv_color_white());
+    lv_style_set_text_font(&style_title, &lv_font_montserrat_14);
+    
+    // Status panel style
+    lv_style_init(&style_status_panel);
+    lv_style_set_bg_color(&style_status_panel, lv_color_hex(0x1a1a3a));
+    lv_style_set_bg_opa(&style_status_panel, LV_OPA_80);
+    lv_style_set_radius(&style_status_panel, 8);
+    lv_style_set_pad_all(&style_status_panel, 8);
+    lv_style_set_border_color(&style_status_panel, lv_color_hex(0x4CAF50));
+    lv_style_set_border_width(&style_status_panel, 1);
+    lv_style_set_border_opa(&style_status_panel, LV_OPA_50);
+    
+    // Progress bar style
+    lv_style_init(&style_progress_bar);
+    lv_style_set_bg_color(&style_progress_bar, lv_color_hex(0x4CAF50));
+    lv_style_set_bg_grad_color(&style_progress_bar, lv_color_hex(0x81C784));
+    lv_style_set_bg_grad_dir(&style_progress_bar, LV_GRAD_DIR_HOR);
+    lv_style_set_radius(&style_progress_bar, 10);
+    
+    // Logo container style
+    lv_style_init(&style_logo);
+    lv_style_set_bg_color(&style_logo, lv_color_hex(0x4CAF50));
+    lv_style_set_bg_opa(&style_logo, LV_OPA_20);
+    lv_style_set_radius(&style_logo, 50);
+    lv_style_set_border_color(&style_logo, lv_color_hex(0x4CAF50));
+    lv_style_set_border_width(&style_logo, 2);
+    lv_style_set_border_opa(&style_logo, LV_OPA_60);
+}
+
+static void update_boot_progress(int progress)
+{
+    if (boot_progress_bar != NULL) {
+        lv_bar_set_value(boot_progress_bar, progress, LV_ANIM_ON);
+    }
+}
+
 static void create_boot_animation(void)
 {
+    // Initialize styles first
+    init_styles();
+    
     boot_screen = lv_obj_create(NULL);
     lv_obj_clear_flag(boot_screen, LV_OBJ_FLAG_SCROLLABLE);
-    
-    lv_style_init(&style_screen);
-    lv_style_set_bg_color(&style_screen, lv_color_black());
     lv_obj_add_style(boot_screen, &style_screen, LV_STATE_DEFAULT);
 
-    // Create title label
-    boot_label = lv_label_create(boot_screen);
-    lv_label_set_text(boot_label, "SmartAssistant");
-    lv_obj_set_style_text_color(boot_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(boot_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(boot_label, LV_ALIGN_CENTER, 0, -60);
+    // Create logo container with pulsing effect
+    boot_logo_container = lv_obj_create(boot_screen);
+    lv_obj_set_size(boot_logo_container, 100, 100);
+    lv_obj_align(boot_logo_container, LV_ALIGN_CENTER, 0, -80);
+    lv_obj_add_style(boot_logo_container, &style_logo, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(boot_logo_container, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Create spinner animation
-    boot_spinner = lv_spinner_create(boot_screen, 1000, 90);
-    lv_obj_set_size(boot_spinner, 40, 40);
-    lv_obj_align(boot_spinner, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_arc_color(boot_spinner, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(boot_spinner, lv_color_hex(0x4CAF50), LV_PART_INDICATOR);
+    // Create title label inside logo container
+    boot_label = lv_label_create(boot_logo_container);
+    lv_label_set_text(boot_label, "SA");
+    lv_obj_add_style(boot_label, &style_title, LV_STATE_DEFAULT);
+    lv_obj_center(boot_label);
 
-    // Create status label
-    boot_status_label = lv_label_create(boot_screen);
-    lv_label_set_text(boot_status_label, "Initializing...");
-    lv_obj_set_style_text_color(boot_status_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(boot_status_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(boot_status_label, LV_ALIGN_CENTER, 0, 60);
+    // Create system title
+    lv_obj_t *system_title = lv_label_create(boot_screen);
+    lv_label_set_text(system_title, "SmartAssistant");
+    lv_obj_add_style(system_title, &style_title, LV_STATE_DEFAULT);
+    lv_obj_align(system_title, LV_ALIGN_CENTER, 0, -20);
+
+    // Create progress bar
+    boot_progress_bar = lv_bar_create(boot_screen);
+    lv_obj_set_size(boot_progress_bar, 280, 8);
+    lv_obj_align(boot_progress_bar, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_add_style(boot_progress_bar, &style_progress_bar, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(boot_progress_bar, lv_color_hex(0x333333), LV_PART_MAIN);
+    lv_obj_set_style_radius(boot_progress_bar, 4, LV_PART_MAIN);
+    lv_bar_set_range(boot_progress_bar, 0, 100);
+    lv_bar_set_value(boot_progress_bar, 0, LV_ANIM_OFF);
+
+    // Create status panel
+    lv_obj_t *status_panel = lv_obj_create(boot_screen);
+    lv_obj_set_size(status_panel, 300, 50);
+    lv_obj_align(status_panel, LV_ALIGN_CENTER, 0, 65);
+    lv_obj_add_style(status_panel, &style_status_panel, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(status_panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Create status label inside panel
+    boot_status_label = lv_label_create(status_panel);
+    lv_label_set_text(boot_status_label, "Initializing System...");
+    lv_obj_add_style(boot_status_label, &style_title, LV_STATE_DEFAULT);
+    lv_obj_center(boot_status_label);
+
+    // Create pulsing animation for logo using opacity
+    lv_anim_t pulse_anim;
+    lv_anim_init(&pulse_anim);
+    lv_anim_set_var(&pulse_anim, boot_logo_container);
+    lv_anim_set_exec_cb(&pulse_anim, (lv_anim_exec_xcb_t)lv_obj_set_style_opa);
+    lv_anim_set_values(&pulse_anim, LV_OPA_50, LV_OPA_100);
+    lv_anim_set_time(&pulse_anim, 1000);
+    lv_anim_set_repeat_count(&pulse_anim, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_playback_time(&pulse_anim, 1000);
+    lv_anim_start(&pulse_anim);
 
     // Load boot screen
     lv_scr_load(boot_screen);
 
-    ESP_LOGI(TAG, "Boot animation created with spinner");
+    ESP_LOGI(TAG, "Modern boot animation created");
 }
 
 static void create_main_screen(void)
@@ -390,57 +491,122 @@ static void create_main_screen(void)
     lv_obj_clear_flag(main_screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_style(main_screen, &style_screen, LV_STATE_DEFAULT);
 
-    // Create time display (center)
-    lv_obj_t *time_label = lv_label_create(main_screen);
+    // Create main time card (center)
+    lv_obj_t *time_card = lv_obj_create(main_screen);
+    lv_obj_set_size(time_card, 280, 120);
+    lv_obj_align(time_card, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_add_style(time_card, &style_card, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(time_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Time display
+    lv_obj_t *time_label = lv_label_create(time_card);
     lv_label_set_text(time_label, "12:34");
     lv_obj_set_style_text_color(time_label, lv_color_white(), LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(time_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(time_label, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_align(time_label, LV_ALIGN_CENTER, 0, -15);
 
-    // Create date display (below time)
-    lv_obj_t *date_label = lv_label_create(main_screen);
-    lv_label_set_text(date_label, "2024-01-01 Monday");
-    lv_obj_set_style_text_color(date_label, lv_color_white(), LV_STATE_DEFAULT);
+    // Date display
+    lv_obj_t *date_label = lv_label_create(time_card);
+    lv_label_set_text(date_label, "2025-01-17 Friday");
+    lv_obj_set_style_text_color(date_label, lv_color_hex(0xaaaaaa), LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(date_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(date_label, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_align(date_label, LV_ALIGN_CENTER, 0, 15);
 
-    // Create action status (top-left)
-    lv_obj_t *action_label = lv_label_create(main_screen);
-    lv_label_set_text(action_label, "Action: Reading");
-    lv_obj_set_style_text_color(action_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(action_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(action_label, LV_ALIGN_TOP_LEFT, 10, 10);
+    // Action status card (top-left)
+    lv_obj_t *action_card = lv_obj_create(main_screen);
+    lv_obj_set_size(action_card, 140, 80);
+    lv_obj_align(action_card, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_add_style(action_card, &style_card, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(action_card, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Create weather info (top-right)
-    lv_obj_t *weather_label = lv_label_create(main_screen);
-    lv_label_set_text(weather_label, "Weather: 22°C\nRain: 20%");
-    lv_obj_set_style_text_color(weather_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(weather_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(weather_label, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_t *action_title = lv_label_create(action_card);
+    lv_label_set_text(action_title, "Activity");
+    lv_obj_set_style_text_color(action_title, lv_color_hex(0x4CAF50), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(action_title, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(action_title, LV_ALIGN_TOP_MID, 0, 5);
 
-    // Create WiFi status (bottom-right)
-    lv_obj_t *wifi_label = lv_label_create(main_screen);
-    lv_label_set_text(wifi_label, "WiFi: Connected\nSignal: Strong");
-    lv_obj_set_style_text_color(wifi_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(wifi_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(wifi_label, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_t *action_status = lv_label_create(action_card);
+    lv_label_set_text(action_status, "Reading");
+    lv_obj_add_style(action_status, &style_title, LV_STATE_DEFAULT);
+    lv_obj_align(action_status, LV_ALIGN_CENTER, 0, 5);
 
-    // Create assistant status (bottom-left)
-    lv_obj_t *assistant_label = lv_label_create(main_screen);
-    lv_label_set_text(assistant_label, "Assistant: Ready");
-    lv_obj_set_style_text_color(assistant_label, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(assistant_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(assistant_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    // Weather card (top-right)
+    lv_obj_t *weather_card = lv_obj_create(main_screen);
+    lv_obj_set_size(weather_card, 140, 80);
+    lv_obj_align(weather_card, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_add_style(weather_card, &style_card, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(weather_card, LV_OBJ_FLAG_SCROLLABLE);
 
-    ESP_LOGI(TAG, "Main screen created with mock data");
+    lv_obj_t *weather_title = lv_label_create(weather_card);
+    lv_label_set_text(weather_title, "Weather");
+    lv_obj_set_style_text_color(weather_title, lv_color_hex(0x2196F3), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_title, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(weather_title, LV_ALIGN_TOP_MID, 0, 5);
+
+    lv_obj_t *weather_temp = lv_label_create(weather_card);
+    lv_label_set_text(weather_temp, "22°C");
+    lv_obj_add_style(weather_temp, &style_title, LV_STATE_DEFAULT);
+    lv_obj_align(weather_temp, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_t *weather_desc = lv_label_create(weather_card);
+    lv_label_set_text(weather_desc, "Rain 20%");
+    lv_obj_set_style_text_color(weather_desc, lv_color_hex(0xaaaaaa), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(weather_desc, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(weather_desc, LV_ALIGN_BOTTOM_MID, 0, -8);
+
+    // WiFi status card (bottom-right)
+    lv_obj_t *wifi_card = lv_obj_create(main_screen);
+    lv_obj_set_size(wifi_card, 140, 80);
+    lv_obj_align(wifi_card, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_add_style(wifi_card, &style_card, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(wifi_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *wifi_title = lv_label_create(wifi_card);
+    lv_label_set_text(wifi_title, "Network");
+    lv_obj_set_style_text_color(wifi_title, lv_color_hex(0xFF9800), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(wifi_title, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(wifi_title, LV_ALIGN_TOP_MID, 0, 5);
+
+    lv_obj_t *wifi_status = lv_label_create(wifi_card);
+    lv_label_set_text(wifi_status, "Connected");
+    lv_obj_add_style(wifi_status, &style_title, LV_STATE_DEFAULT);
+    lv_obj_align(wifi_status, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_t *wifi_signal = lv_label_create(wifi_card);
+    lv_label_set_text(wifi_signal, "Strong");
+    lv_obj_set_style_text_color(wifi_signal, lv_color_hex(0xaaaaaa), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(wifi_signal, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(wifi_signal, LV_ALIGN_BOTTOM_MID, 0, -8);
+
+    // Assistant status card (bottom-left)
+    lv_obj_t *assistant_card = lv_obj_create(main_screen);
+    lv_obj_set_size(assistant_card, 140, 80);
+    lv_obj_align(assistant_card, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    lv_obj_add_style(assistant_card, &style_card, LV_STATE_DEFAULT);
+    lv_obj_clear_flag(assistant_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *assistant_title = lv_label_create(assistant_card);
+    lv_label_set_text(assistant_title, "Assistant");
+    lv_obj_set_style_text_color(assistant_title, lv_color_hex(0x9C27B0), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(assistant_title, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_align(assistant_title, LV_ALIGN_TOP_MID, 0, 5);
+
+    lv_obj_t *assistant_status = lv_label_create(assistant_card);
+    lv_label_set_text(assistant_status, "Ready");
+    lv_obj_add_style(assistant_status, &style_title, LV_STATE_DEFAULT);
+    lv_obj_align(assistant_status, LV_ALIGN_CENTER, 0, 5);
+
+    ESP_LOGI(TAG, "Modern main screen created with card layout");
 }
 
-void display_update_boot_status(const char* status_text)
+void display_update_boot_status(const char* status_text, int progress)
 {
     if (boot_status_label != NULL) {
         lv_label_set_text(boot_status_label, status_text);
-        ESP_LOGI(TAG, "Boot status updated: %s", status_text);
     }
+    
+    update_boot_progress(progress);
+    ESP_LOGI(TAG, "Boot status updated: %s (%d%%)", status_text, progress);
 }
 
 void display_complete_boot_animation(void)
@@ -459,6 +625,8 @@ void display_complete_boot_animation(void)
     boot_label = NULL;
     boot_spinner = NULL;
     boot_status_label = NULL;
+    boot_progress_bar = NULL;
+    boot_logo_container = NULL;
 }
 
 esp_err_t display_init_and_show_boot_animation(void)
@@ -560,6 +728,8 @@ esp_err_t display_deinit(void)
     boot_label = NULL;
     boot_spinner = NULL;
     boot_status_label = NULL;
+    boot_progress_bar = NULL;
+    boot_logo_container = NULL;
     boot_screen = NULL;
     main_screen = NULL;
     

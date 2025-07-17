@@ -28,11 +28,12 @@ esp_err_t display_init_and_show_boot_animation(void);
 void display_set_brightness(int brightness_percentage);
 
 /**
- * @brief Update boot animation status text
+ * @brief Update boot animation status text and progress
  * 
- * @param status_text The status text to display below the spinner
+ * @param status_text The status text to display
+ * @param progress Progress percentage (0-100)
  */
-void display_update_boot_status(const char* status_text);
+void display_update_boot_status(const char* status_text, int progress);
 
 /**
  * @brief Complete boot animation and transition to main screen
