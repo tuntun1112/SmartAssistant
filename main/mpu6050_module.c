@@ -44,6 +44,15 @@ static uint32_t get_time_seconds(void)
     return (uint32_t)(esp_timer_get_time() / 1000000);
 }
 
+/**
+ * @brief Calculate acceleration magnitude
+ * Note: Currently unused but kept for future shake detection improvements
+ */
+__attribute__((unused))
+static float calculate_magnitude(float x, float y, float z)
+{
+    return sqrtf(x * x + y * y + z * z);
+}
 
 /**
  * @brief Detect shake activity - FIXED for tilt resistance
