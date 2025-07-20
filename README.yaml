@@ -1,0 +1,136 @@
+project:  # 專案摘要
+  title: "Smart Assistant Project"        # 高中自主學習-智慧小助理專題實作
+  authors:                                 # 作者
+    - name: "張宸碩"
+      class: "371"
+      school: "Fudan Senior High School"
+    - name: "詹秉豐"
+      class: "367"
+      school: "Fudan Senior High School"
+
+  abstract: |                              # 摘要
+    我們將會以一張 ESP32-S3 開發板以及一張 Orange Pi One 512 MB
+    為核心，製作一個可以 24 小時擺放在房間書桌上的智能小助理，
+    可以和使用者交互、分析行為或是執行動作，作為高中自主學習
+    跨學期專題。
+
+features:  # 功能列表
+  startup_sleep_wakeup:                    # 啟動、休眠與喚醒
+    first_boot:                            # 首次開機流程
+      - show_boot_animation                # 1. 顯示開機動畫
+      - run_hardware_self_test             # 2. 測試所有外設
+      - wait_for_linux_boot                # 3. 等待 Orange Pi 開機
+      - enter_main_screen                  # 4. 進入主畫面
+    standby_wakeup:                        # 待機與喚醒
+      sleep_trigger:
+        - no_pir_signal                    # PIR 無人
+        - no_motion_detected               # 動作辨識無人
+      wake_trigger:
+        - pir_signal                       # PIR 有人
+        - touch_event                      # 觸控或按壓
+
+  main_functions:                          # 主要功能
+    persistent_clock:                      # 常駐小時鐘
+      description: "Show current time like a desk clock" 
+      screen_layout:                       # 畫面佈局
+        center: current_time               # 中間大字顯示時間
+        top_left: motion_status            # 左上：動作辨識狀態
+        top_right: weather_info            # 右上：天氣資訊
+        bottom_left: assistant_animation   # 左下：小助理表情動畫
+        bottom_right: wifi_status          # 右下：Wi-Fi 訊號
+    basic_interaction:                     # 基礎交互
+      triggers:
+        - shake_detected                   # 搖晃
+        - tap_detected                     # 輕拍
+        - press_detected                   # 按壓
+      response: assistant_expression       # 表情反饋
+    dialogue_mode:                         # 對話功能
+      wifi_required: true
+      enter_condition: long_press          # 長壓按鈕進入
+      process_flow:
+        - record_audio                     # 錄音
+        - send_to_llm_api                  # 發送到 LLM API
+        - receive_audio_reply              # 接收語音回覆
+        - show_subtitle                    # 顯示字幕
+    action_recognition:                    # 智能動作辨識
+      description: "Detect user activity and send reminders"
+      examples:
+        - EMPTY # 無人
+        - BED # 在床上
+        - PC # 在電腦前
+        - STUDY # 在讀書
+        - PHONE # 在使用手機
+        - TABLET # 在使用平板
+        - DRINK # 在喝水
+      reminders:
+        - too_much_phone_use # 手機使用過多
+        - stand_up_and_move # 起身活動
+        - drink_water # 喝水
+
+dev_notes:  # 開發筆記
+  - "首次開發需要在 sdkconfig 針對 ESP32‑S3‑N16R8 設置"
+  - 'ILI9488 需使用 "atanisoft/esp_lcd_ili9488" 驅動 (https://github.com/atanisoft/esp_lcd_ili9488)'
+
+hardware:  # 硬體
+  main_board:
+    name: ESP32-S3-N16R8-WROOM-1
+    peripherals:
+      display:
+        driver: ILI9488
+        touch: XPT2046
+      sensors:
+        - MPU-6050  # 3‑axis IMU
+        - INMP441   # I2S microphone
+        - MAX98357  # I2S amplifier
+        - speaker:
+            power: "3W"
+            impedance: "4Ω"
+        - DS3231    # RTC module
+        - SD_card
+        - HC-SR505  # PIR
+        - microswitch
+  aux_board:
+    name: Orange_Pi_One
+    ram: 512MB
+    peripherals:
+      camera: GC2033  # 2 MP
+
+gpio_map:  # GPIO 映射
+  ili9488:
+    SPI_CLOCK: GPIO_NUM_11
+    SPI_MOSI:  GPIO_NUM_10
+    SPI_MISO:  GPIO_NUM_13
+    TFT_CS:    GPIO_NUM_3
+    TFT_RESET: GPIO_NUM_46
+    TFT_DC:    GPIO_NUM_9
+    TFT_BACKLIGHT: GPIO_NUM_12
+
+environment:  # 開發環境
+  os: Windows_11_Pro
+  ide: Visual_Studio_Code
+  esp_idf: v5.4
+
+ai_dev_rules:  # AI 開發規則
+  - "編譯通常使用官方【構建項目】按鈕，請勿自創腳本或全域安裝套件"
+  - "如已有官方/認證驅動，請勿重造輪胎"
+  - "遇到問題先搜尋社群或使用 Zen MCP 與專家討論"
+  - "需求不清或多解方案時提出選項詢問用戶"
+  - "此專案為高中自主學習，目標為 MVP、功能導向、邏輯清晰"
+
+models:  # Zen MCP 模型列表
+  google_gemini:
+    - id: gemini-2.5-flash
+    - id: gemini-2.5-pro
+    - id: gemini-2.0-flash
+      note: "異常：無思考模式"
+    - id: gemini-2.0-flash-lite
+      note: "異常：無思考模式"
+  openai:
+    - id: o3
+      note: "異常：無組織驗證"
+    - id: o3-mini
+    - id: o4-mini
+    - id: gpt-4.1-2025-04-14
+  x_ai:
+    - id: grok-3
+    - id: grok-3-fast
