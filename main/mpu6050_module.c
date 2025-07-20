@@ -27,7 +27,6 @@ static uint32_t tap_display_start = 0;          // When tap was first detected (
 static uint32_t shake_start_time = 0;           // When continuous shake started
 static uint32_t shake_display_start = 0;        // When shake was confirmed (for display timer)
 static bool is_shaking = false;                 // STATE: Are we currently in shake mode?
-// Note: baseline_magnitude removed as it's currently unused
 
 /**
  * @brief Get current time in milliseconds since boot
@@ -45,15 +44,6 @@ static uint32_t get_time_seconds(void)
     return (uint32_t)(esp_timer_get_time() / 1000000);
 }
 
-/**
- * @brief Calculate acceleration magnitude
- * Note: Currently unused but kept for future shake detection improvements
- */
-__attribute__((unused))
-static float calculate_magnitude(float x, float y, float z)
-{
-    return sqrtf(x * x + y * y + z * z);
-}
 
 /**
  * @brief Detect shake activity - FIXED for tilt resistance
@@ -124,7 +114,6 @@ static bool detect_tap(float ax, float ay, float az)
     return false;
 }
 
-// Tilt detection removed - not suitable for flat-mounted sensor
 
 /**
  * @brief Motion detection task

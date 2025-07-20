@@ -42,7 +42,6 @@ static esp_err_t ds3231_read_time(time_info_t *time_info);
 static esp_err_t ds3231_write_time(const time_info_t *time_info);
 static uint8_t bcd_to_dec(uint8_t val);
 static uint8_t dec_to_bcd(uint8_t val);
-// Removed unused function declarations to fix compilation warnings
 
 static esp_err_t ds3231_init(void)
 {
@@ -247,8 +246,6 @@ static void time_update_task(void *arg)
     vTaskDelete(NULL);
 }
 
-// Note: update_display_with_current_time temporarily removed as it's unused
-// due to static time display implementation
 
 esp_err_t time_module_init(void)
 {

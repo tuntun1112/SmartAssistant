@@ -318,7 +318,7 @@ static esp_err_t initialize_lvgl(void)
     lv_buf_1 = (lv_color_t *)heap_caps_malloc(LV_BUFFER_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
     
     if (lv_buf_1 == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate LVGL buffer memory");
+        ESP_LOGE(TAG, "Failed to allocate LVGL buffer memory: %zu bytes needed for DMA-capable buffer", LV_BUFFER_SIZE * sizeof(lv_color_t));
         return ESP_ERR_NO_MEM;
     }
 
@@ -568,7 +568,7 @@ void display_update_time(int hours, int minutes, int seconds)
         lv_label_set_text(time_label, current_time_str);
         ESP_LOGI(TAG, "Time updated: %s (label ptr: %p)", current_time_str, time_label);
     } else {
-        ESP_LOGE(TAG, "Time label is NULL!");
+        ESP_LOGE(TAG, "Time label is NULL - display may not be properly initialized or main screen not created");
     }
 }
 
@@ -607,7 +607,7 @@ void display_update_pir_status(const char* pir_status_text)
         lv_label_set_text(pir_status_label, pir_status_text);
         ESP_LOGD(TAG, "PIR status updated: %s", pir_status_text);
     } else {
-        ESP_LOGW(TAG, "PIR status label is NULL or invalid text provided");
+        ESP_LOGW(TAG, "PIR status label is NULL or invalid text provided - main screen may not be initialized");
     }
 }
 
@@ -617,7 +617,7 @@ void display_update_motion_status(const char* motion_status_text)
         lv_label_set_text(motion_status_label, motion_status_text);
         ESP_LOGD(TAG, "Motion status updated: %s", motion_status_text);
     } else {
-        ESP_LOGW(TAG, "Motion status label is NULL or invalid text provided");
+        ESP_LOGW(TAG, "Motion status label is NULL or invalid text provided - main screen may not be initialized");
     }
 }
 

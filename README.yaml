@@ -113,7 +113,7 @@ gpio_map:  # GPIO 映射
     SCL: GPIO_NUM_6   # I2C1時鐘線（獨立匯流排）
     I2C_ADDRESS: 0x69 # MPU-6050的I2C地址（AD0接高電平）
   hc_sr505:
-    PIR_OUTPUT: GPIO_NUM_7  #暫定、可更改
+    PIR_OUTPUT: GPIO_NUM_7
 
 environment:  # 開發環境
   os: Windows_11_Pro
