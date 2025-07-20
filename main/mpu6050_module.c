@@ -17,7 +17,7 @@ static const char *TAG = "MPU6050Module";
 static const i2c_port_t I2C_PORT = I2C_NUM_0;
 
 // Motion detection thresholds - USER CUSTOMIZED
-static const float TAP_Z_THRESHOLD = 0.4f;      // Z-axis threshold for tap (user requested)
+static const float TAP_Z_THRESHOLD = 0.2f;      // Z-axis threshold for tap (hyper sensitive)
 static const float SHAKE_THRESHOLD = 0.18f;     // g-force threshold for shake activity
 static const uint32_t TAP_DEBOUNCE_MS = 180;    // Tap response time
 static const uint32_t TAP_DISPLAY_MS = 800;     // Tap display duration (0.8 seconds)
@@ -65,30 +65,46 @@ static float calculate_magnitude(float x, float y, float z)
 }
 
 /**
- * @brief Detect shake activity - more sensitive horizontal shake detection
- * STATE MACHINE: Detects X/Y axis movement for flat-mounted sensor
+ * @brief Detect shake activity - FIXED for tilt resistance
+ * STATE MACHINE: Detects CHANGES in acceleration, not absolute values
  */
 static bool detect_shake_activity(float ax, float ay, float az)
 {
-    // For flat-mounted sensor, focus on X/Y axis movements (horizontal shake)
-    float xy_magnitude = sqrtf(ax * ax + ay * ay);
+    static float prev_ax = 0, prev_ay = 0, prev_az = 0;
+    static bool first_run = true;
     
-    // Also check overall magnitude deviation
-    float total_magnitude = calculate_magnitude(ax, ay, az);
-    float deviation = fabsf(total_magnitude - baseline_magnitude);
+    if (first_run) {
+        prev_ax = ax;
+        prev_ay = ay; 
+        prev_az = az;
+        first_run = false;
+        return false;
+    }
     
-    // Detect shake if either:
-    // 1. Strong X/Y movement (horizontal shaking)
-    // 2. Overall movement above threshold
-    return (xy_magnitude > SHAKE_THRESHOLD) || (deviation > SHAKE_THRESHOLD);
+    // Calculate CHANGE in acceleration (not absolute values)
+    float delta_x = fabsf(ax - prev_ax);
+    float delta_y = fabsf(ay - prev_ay);
+    float delta_z = fabsf(az - prev_az);
+    
+    // Update previous values
+    prev_ax = ax;
+    prev_ay = ay;
+    prev_az = az;
+    
+    // Detect shake based on acceleration CHANGES
+    float total_change = sqrtf(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z);
+    
+    return total_change > SHAKE_THRESHOLD;
 }
 
 /**
- * @brief Detect tap gesture - Z-axis focused for flat-mounted sensor
- * STATE MACHINE: Detects vertical tapping motion (up/down on flat surface)
+ * @brief Detect tap gesture - FIXED for tilt resistance  
+ * STATE MACHINE: Detects sudden Z-axis CHANGES, not absolute values
  */
 static bool detect_tap(float ax, float ay, float az)
 {
+    static float prev_tap_z = 1.0f;
+    static bool tap_first_run = true;
     uint32_t current_time = get_time_ms();
     
     // Don't detect tap if currently shaking
@@ -96,12 +112,18 @@ static bool detect_tap(float ax, float ay, float az)
         return false;
     }
     
-    // Z-axis tap detection for flat-mounted sensor
-    // Look for sudden changes in Z-axis (vertical tapping)
-    float z_deviation = fabsf(az - baseline_magnitude);
+    if (tap_first_run) {
+        prev_tap_z = az;
+        tap_first_run = false;
+        return false;
+    }
     
-    // Very sensitive Z-axis tap detection
-    if (z_deviation > TAP_Z_THRESHOLD) {
+    // Detect CHANGE in Z-axis (not absolute value vs baseline)
+    float z_change = fabsf(az - prev_tap_z);
+    prev_tap_z = az;
+    
+    // Very sensitive Z-axis change detection
+    if (z_change > TAP_Z_THRESHOLD) {
         if (current_time - last_tap_time > TAP_DEBOUNCE_MS) {
             last_tap_time = current_time;
             return true;
