@@ -1,4 +1,5 @@
 #include "mpu6050_module.h"
+#include "project_config.h"
 #include "mpu6050.h"
 #include <driver/i2c.h>
 #include <driver/gpio.h>
@@ -12,18 +13,6 @@
 #include <math.h>
 
 static const char *TAG = "MPU6050Module";
-
-// I2C configuration (shared with DS3231)
-static const i2c_port_t I2C_PORT = I2C_NUM_0;
-
-// Motion detection thresholds - USER CUSTOMIZED
-static const float TAP_Z_THRESHOLD = 0.2f;      // Z-axis threshold for tap (hyper sensitive)
-static const float SHAKE_THRESHOLD = 0.18f;     // g-force threshold for shake activity
-static const uint32_t TAP_DEBOUNCE_MS = 180;    // Tap response time
-static const uint32_t TAP_DISPLAY_MS = 800;     // Tap display duration (0.8 seconds)
-static const uint32_t SHAKE_MIN_DURATION_MS = 500; // Shake confirmation time
-static const uint32_t SHAKE_DISPLAY_MS = 800;   // Shake minimum display duration (0.8 seconds)
-static const uint32_t SHAKE_TIMEOUT_MS = 500;   // Longer reset time for shake
 
 // Module state
 static mpu6050_handle_t mpu6050_handle = NULL;
@@ -94,7 +83,7 @@ static bool detect_shake_activity(float ax, float ay, float az)
     // Detect shake based on acceleration CHANGES
     float total_change = sqrtf(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z);
     
-    return total_change > SHAKE_THRESHOLD;
+    return total_change > CONFIG_MPU6050_SHAKE_THRESHOLD;
 }
 
 /**
@@ -123,8 +112,8 @@ static bool detect_tap(float ax, float ay, float az)
     prev_tap_z = az;
     
     // Very sensitive Z-axis change detection
-    if (z_change > TAP_Z_THRESHOLD) {
-        if (current_time - last_tap_time > TAP_DEBOUNCE_MS) {
+    if (z_change > CONFIG_MPU6050_TAP_Z_THRESHOLD) {
+        if (current_time - last_tap_time > CONFIG_MPU6050_TAP_DEBOUNCE_MS) {
             last_tap_time = current_time;
             return true;
         }
@@ -165,7 +154,7 @@ static void motion_detection_task(void *pvParameters)
                     last_shake_activity_time = current_time;
                     
                     // Confirm SHAKE if continuous activity for required duration
-                    if (!is_shaking && (current_time - shake_start_time >= SHAKE_MIN_DURATION_MS)) {
+                    if (!is_shaking && (current_time - shake_start_time >= CONFIG_MPU6050_SHAKE_MIN_DURATION_MS)) {
                         is_shaking = true;
                         motion_status.shake_detected = true;
                         motion_status.tap_detected = false; // Shake overrides tap
@@ -175,14 +164,14 @@ static void motion_detection_task(void *pvParameters)
                     }
                 } else {
                     // No shake activity - check for timeout
-                    if (shake_start_time > 0 && (current_time - last_shake_activity_time > SHAKE_TIMEOUT_MS)) {
+                    if (shake_start_time > 0 && (current_time - last_shake_activity_time > CONFIG_MPU6050_SHAKE_TIMEOUT_MS)) {
                         // Reset shake detection state
                         shake_start_time = 0;
                         is_shaking = false;
                         ESP_LOGI(TAG, "SHAKE activity ended");
                         
                         // BUT keep displaying for minimum time if not elapsed
-                        if (shake_display_start > 0 && (current_time - shake_display_start < SHAKE_DISPLAY_MS)) {
+                        if (shake_display_start > 0 && (current_time - shake_display_start < CONFIG_MPU6050_SHAKE_DISPLAY_MS)) {
                             // Keep showing SHAKE until minimum display time
                             motion_status.shake_detected = true;
                         } else {
@@ -193,9 +182,9 @@ static void motion_detection_task(void *pvParameters)
                     }
                 }
                 
-                // 5. SHAKE DISPLAY TIMEOUT (minimum 0.8 seconds)
+                // 5. SHAKE DISPLAY TIMEOUT (minimum configured seconds)
                 if (motion_status.shake_detected && shake_display_start > 0 && !is_shaking) {
-                    if (current_time - shake_display_start >= SHAKE_DISPLAY_MS) {
+                    if (current_time - shake_display_start >= CONFIG_MPU6050_SHAKE_DISPLAY_MS) {
                         motion_status.shake_detected = false;
                         shake_display_start = 0;
                         ESP_LOGI(TAG, "SHAKE display timeout");
@@ -210,9 +199,9 @@ static void motion_detection_task(void *pvParameters)
                     ESP_LOGI(TAG, "TAP detected!");
                 }
                 
-                // 4. TAP DISPLAY TIMEOUT (exactly 0.8 seconds)
+                // 4. TAP DISPLAY TIMEOUT (configured duration)
                 if (motion_status.tap_detected && tap_display_start > 0) {
-                    if (current_time - tap_display_start >= TAP_DISPLAY_MS) {
+                    if (current_time - tap_display_start >= CONFIG_MPU6050_TAP_DISPLAY_MS) {
                         motion_status.tap_detected = false;
                         tap_display_start = 0;
                         ESP_LOGI(TAG, "TAP display timeout");
@@ -221,8 +210,8 @@ static void motion_detection_task(void *pvParameters)
             }
         }
         
-        // Check sensor every 50ms (20Hz)
-        vTaskDelay(pdMS_TO_TICKS(50));
+        // Check sensor at configured interval
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_MPU6050_POLL_INTERVAL_MS));
     }
 }
 
@@ -239,7 +228,7 @@ esp_err_t mpu6050_module_init(void)
     ESP_LOGI(TAG, "Using existing I2C bus (shared with DS3231)");
     
     // Create MPU6050 device handle (use address 0x69 to avoid conflict with DS3231)
-    mpu6050_handle = mpu6050_create(I2C_PORT, MPU6050_I2C_ADDRESS_1);
+    mpu6050_handle = mpu6050_create(CONFIG_I2C_PORT, MPU6050_I2C_ADDRESS_1);
     if (mpu6050_handle == NULL) {
         ESP_LOGE(TAG, "Failed to create MPU6050 device handle");
         return ESP_FAIL;
@@ -270,9 +259,9 @@ esp_err_t mpu6050_module_init(void)
     BaseType_t task_ret = xTaskCreate(
         motion_detection_task,
         "mpu6050_motion",
-        4096,
+        CONFIG_TASK_STACK_MPU6050,
         NULL,
-        5,
+        CONFIG_TASK_PRIORITY_MPU6050,
         &motion_task_handle
     );
     

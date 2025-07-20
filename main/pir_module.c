@@ -1,4 +1,5 @@
 #include "pir_module.h"
+#include "project_config.h"
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -9,10 +10,6 @@
 #include <stdio.h>
 
 static const char *TAG = "PIRModule";
-
-// PIR sensor GPIO pin (as defined in README.yaml)
-// HC-SR505 PIR sensor output - GPIO_NUM_7
-static const gpio_num_t PIR_GPIO_PIN = GPIO_NUM_7;
 
 // PIR status
 static pir_status_t pir_status = {
@@ -42,7 +39,7 @@ static void pir_monitoring_task(void *pvParameters)
     
     while (1) {
         // Read current PIR sensor state
-        int gpio_level = gpio_get_level(PIR_GPIO_PIN);
+        int gpio_level = gpio_get_level(CONFIG_PIR_OUTPUT_GPIO);
         bool current_motion = (gpio_level == 1);
         uint32_t current_time = get_time_seconds();
         
@@ -68,8 +65,8 @@ static void pir_monitoring_task(void *pvParameters)
             }
         }
         
-        // Check PIR sensor every 500ms
-        vTaskDelay(pdMS_TO_TICKS(500));
+        // Check PIR sensor at configured interval
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_PIR_POLL_INTERVAL_MS));
     }
 }
 
@@ -84,7 +81,7 @@ esp_err_t pir_module_init(void)
     
     // Configure PIR GPIO pin as input
     gpio_config_t pir_config = {
-        .pin_bit_mask = (1ULL << PIR_GPIO_PIN),
+        .pin_bit_mask = (1ULL << CONFIG_PIR_OUTPUT_GPIO),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_ENABLE,
@@ -106,9 +103,9 @@ esp_err_t pir_module_init(void)
     BaseType_t task_ret = xTaskCreate(
         pir_monitoring_task,
         "pir_monitor",
-        2048,
+        CONFIG_TASK_STACK_PIR,
         NULL,
-        5,
+        CONFIG_TASK_PRIORITY_PIR,
         &pir_task_handle
     );
     
@@ -118,7 +115,7 @@ esp_err_t pir_module_init(void)
     }
     
     pir_module_initialized = true;
-    ESP_LOGI(TAG, "PIR sensor module initialized successfully on GPIO %d", PIR_GPIO_PIN);
+    ESP_LOGI(TAG, "PIR sensor module initialized successfully on GPIO %d", CONFIG_PIR_OUTPUT_GPIO);
     
     return ESP_OK;
 }
@@ -179,7 +176,7 @@ esp_err_t pir_module_deinit(void)
     }
     
     // Reset GPIO pin
-    gpio_reset_pin(PIR_GPIO_PIN);
+    gpio_reset_pin(CONFIG_PIR_OUTPUT_GPIO);
     
     pir_module_initialized = false;
     ESP_LOGI(TAG, "PIR sensor module deinitialized");

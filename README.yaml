@@ -111,7 +111,7 @@ gpio_map:  # GPIO 映射
   mpu6050:
     SDA: GPIO_NUM_8   # I2C數據線
     SCL: GPIO_NUM_18  # I2C時鐘線
-    I2C_ADDRESS: 0x68 # MPU-6050的I2C地址（AD0接地）
+    I2C_ADDRESS: 0x69 # MPU-6050的I2C地址（AD0接高電平）
   hc_sr505:
     PIR_OUTPUT: GPIO_NUM_7(暫定、可更改)
 
