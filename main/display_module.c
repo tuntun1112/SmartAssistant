@@ -73,6 +73,9 @@ static lv_obj_t *date_label = NULL;
 static char current_time_str[16] = "12:34:56";
 static char current_date_str[32] = "Jul 20, 2025";
 
+// PIR sensor status UI component
+static lv_obj_t *pir_status_label = NULL;
+
 // Forward declarations
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
     esp_lcd_panel_io_event_data_t *edata, void *user_ctx);
@@ -415,6 +418,13 @@ static void create_main_screen(void)
     lv_obj_add_style(motion_text, &style_chinese_font, 0);
     lv_obj_align(motion_text, LV_ALIGN_TOP_LEFT, 10, 10);
 
+    // PIR sensor status (top-left, below motion)
+    pir_status_label = lv_label_create(main_screen);
+    lv_label_set_text(pir_status_label, "PIR: No");
+    lv_obj_set_style_text_color(pir_status_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(pir_status_label, &style_chinese_font, 0);
+    lv_obj_align(pir_status_label, LV_ALIGN_TOP_LEFT, 10, 30);
+
     // Weather info (top-right)
     lv_obj_t *weather_text = lv_label_create(main_screen);
     lv_label_set_text(weather_text, "21C Rainy");
@@ -580,6 +590,16 @@ void display_show_time_error(const char* error_message)
     if (date_label != NULL) {
         lv_label_set_text(date_label, "RTC Error");
         ESP_LOGI(TAG, "Date error displayed");
+    }
+}
+
+void display_update_pir_status(const char* pir_status_text)
+{
+    if (pir_status_label != NULL && pir_status_text != NULL) {
+        lv_label_set_text(pir_status_label, pir_status_text);
+        ESP_LOGD(TAG, "PIR status updated: %s", pir_status_text);
+    } else {
+        ESP_LOGW(TAG, "PIR status label is NULL or invalid text provided");
     }
 }
 

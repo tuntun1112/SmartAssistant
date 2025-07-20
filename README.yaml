@@ -108,6 +108,8 @@ gpio_map:  # GPIO 映射
   ds3231:
     SDA: GPIO_NUM_8
     SCL: GPIO_NUM_18
+  hc_sr505:
+    PIR_OUTPUT: GPIO_NUM_7(暫定、可更改)
 
 environment:  # 開發環境
   os: Windows_11_Pro

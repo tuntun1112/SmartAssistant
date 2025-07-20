@@ -4,6 +4,7 @@
 #include <freertos/task.h>
 #include "display_module.h"
 #include "time_module.h"
+#include "pir_module.h"
 
 static const char *TAG = "SmartAssistant";
 
@@ -47,6 +48,16 @@ static esp_err_t run_boot_sequence(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
+    display_update_boot_status("Initializing PIR sensor...", 65);
+    esp_err_t pir_ret = pir_module_init();
+    if (pir_ret != ESP_OK) {
+        ESP_LOGW(TAG, "PIR module initialization failed, continuing without PIR sensor");
+    }
+    for (int i = 0; i < 5; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
     display_update_boot_status("Connecting to WiFi...", 70);
     for (int i = 0; i < 20; i++) {
         display_task_handler();
@@ -82,9 +93,22 @@ static void run_main_screen(void)
 {
     ESP_LOGI(TAG, "Starting main screen...");
     
+    uint32_t pir_update_counter = 0;
+    
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10));
         display_task_handler();
+        
+        // Update PIR status every 500ms (50 * 10ms)
+        pir_update_counter++;
+        if (pir_update_counter >= 50) {
+            pir_update_counter = 0;
+            
+            char pir_status_str[32];
+            if (pir_get_status_string(pir_status_str, sizeof(pir_status_str)) == ESP_OK) {
+                display_update_pir_status(pir_status_str);
+            }
+        }
     }
 }
 

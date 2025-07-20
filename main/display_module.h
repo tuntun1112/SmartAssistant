@@ -76,6 +76,13 @@ void display_update_date(int year, int month, int day);
 void display_show_time_error(const char* error_message);
 
 /**
+ * @brief Update PIR sensor status display
+ * 
+ * @param pir_status_text PIR status text to display (e.g., "PIR: Yes" or "PIR: No (10s ago)")
+ */
+void display_update_pir_status(const char* pir_status_text);
+
+/**
  * @brief Deinitialize the display system and free resources
  * 
  * This function cleans up all resources allocated by the display system:
