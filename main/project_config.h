@@ -2,7 +2,7 @@
 #define PROJECT_CONFIG_H
 
 #include <driver/gpio.h>
-#include <driver/i2c.h>
+#include <hal/i2c_types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,11 +30,23 @@ extern "C" {
 #define CONFIG_DISPLAY_TFT_DC           GPIO_NUM_9
 #define CONFIG_DISPLAY_TFT_BACKLIGHT    GPIO_NUM_12
 
-// I2C Bus Configuration (shared by DS3231 and MPU6050)
-#define CONFIG_I2C_SDA_GPIO             GPIO_NUM_8
-#define CONFIG_I2C_SCL_GPIO             GPIO_NUM_18
-#define CONFIG_I2C_PORT                 I2C_NUM_0
-#define CONFIG_I2C_FREQ_HZ              100000
+// I2C Bus 0 Configuration (DS3231 RTC)
+#define CONFIG_I2C0_SDA_GPIO            GPIO_NUM_8
+#define CONFIG_I2C0_SCL_GPIO            GPIO_NUM_18
+#define CONFIG_I2C0_PORT                I2C_NUM_0
+#define CONFIG_I2C0_FREQ_HZ             100000
+
+// I2C Bus 1 Configuration (MPU6050 Motion Sensor)
+#define CONFIG_I2C1_SDA_GPIO            GPIO_NUM_5
+#define CONFIG_I2C1_SCL_GPIO            GPIO_NUM_6
+#define CONFIG_I2C1_PORT                I2C_NUM_1
+#define CONFIG_I2C1_FREQ_HZ             400000  // MPU6050 supports faster speed
+
+// Legacy compatibility (for existing code)
+#define CONFIG_I2C_SDA_GPIO             CONFIG_I2C0_SDA_GPIO
+#define CONFIG_I2C_SCL_GPIO             CONFIG_I2C0_SCL_GPIO
+#define CONFIG_I2C_PORT                 CONFIG_I2C0_PORT
+#define CONFIG_I2C_FREQ_HZ              CONFIG_I2C0_FREQ_HZ
 
 // PIR Sensor Configuration
 #define CONFIG_PIR_OUTPUT_GPIO          GPIO_NUM_7

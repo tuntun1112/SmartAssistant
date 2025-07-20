@@ -27,7 +27,7 @@ static uint32_t tap_display_start = 0;          // When tap was first detected (
 static uint32_t shake_start_time = 0;           // When continuous shake started
 static uint32_t shake_display_start = 0;        // When shake was confirmed (for display timer)
 static bool is_shaking = false;                 // STATE: Are we currently in shake mode?
-static float baseline_magnitude = 1.0f;         // Baseline acceleration magnitude (gravity)
+// Note: baseline_magnitude removed as it's currently unused
 
 /**
  * @brief Get current time in milliseconds since boot
@@ -47,7 +47,9 @@ static uint32_t get_time_seconds(void)
 
 /**
  * @brief Calculate acceleration magnitude
+ * Note: Currently unused but kept for future shake detection improvements
  */
+__attribute__((unused))
 static float calculate_magnitude(float x, float y, float z)
 {
     return sqrtf(x * x + y * y + z * z);
@@ -160,7 +162,7 @@ static void motion_detection_task(void *pvParameters)
                         motion_status.tap_detected = false; // Shake overrides tap
                         motion_status.last_motion_time = get_time_seconds();
                         shake_display_start = current_time; // Start display timer
-                        ESP_LOGI(TAG, "SHAKE confirmed!");
+                        ESP_LOGD(TAG, "Shake motion confirmed");
                     }
                 } else {
                     // No shake activity - check for timeout
@@ -168,7 +170,7 @@ static void motion_detection_task(void *pvParameters)
                         // Reset shake detection state
                         shake_start_time = 0;
                         is_shaking = false;
-                        ESP_LOGI(TAG, "SHAKE activity ended");
+                        ESP_LOGD(TAG, "Shake activity timeout");
                         
                         // BUT keep displaying for minimum time if not elapsed
                         if (shake_display_start > 0 && (current_time - shake_display_start < CONFIG_MPU6050_SHAKE_DISPLAY_MS)) {
@@ -187,7 +189,7 @@ static void motion_detection_task(void *pvParameters)
                     if (current_time - shake_display_start >= CONFIG_MPU6050_SHAKE_DISPLAY_MS) {
                         motion_status.shake_detected = false;
                         shake_display_start = 0;
-                        ESP_LOGI(TAG, "SHAKE display timeout");
+                        ESP_LOGD(TAG, "Shake display timeout");
                     }
                 }
                 
@@ -196,7 +198,7 @@ static void motion_detection_task(void *pvParameters)
                     motion_status.tap_detected = true;
                     motion_status.last_motion_time = get_time_seconds();
                     tap_display_start = current_time; // Start 0.8s display timer
-                    ESP_LOGI(TAG, "TAP detected!");
+                    ESP_LOGD(TAG, "Tap motion detected");
                 }
                 
                 // 4. TAP DISPLAY TIMEOUT (configured duration)
@@ -204,7 +206,7 @@ static void motion_detection_task(void *pvParameters)
                     if (current_time - tap_display_start >= CONFIG_MPU6050_TAP_DISPLAY_MS) {
                         motion_status.tap_detected = false;
                         tap_display_start = 0;
-                        ESP_LOGI(TAG, "TAP display timeout");
+                        ESP_LOGD(TAG, "Tap display timeout");
                     }
                 }
             }
@@ -224,18 +226,39 @@ esp_err_t mpu6050_module_init(void)
         return ESP_OK;
     }
     
-    // Skip I2C initialization - assume it's already initialized by time_module
-    ESP_LOGI(TAG, "Using existing I2C bus (shared with DS3231)");
+    // Initialize dedicated I2C bus for MPU6050
+    ESP_LOGI(TAG, "Initializing dedicated I2C bus for MPU6050 on pins SDA:%d, SCL:%d", CONFIG_I2C1_SDA_GPIO, CONFIG_I2C1_SCL_GPIO);
     
-    // Create MPU6050 device handle (use address 0x69 to avoid conflict with DS3231)
-    mpu6050_handle = mpu6050_create(CONFIG_I2C_PORT, MPU6050_I2C_ADDRESS_1);
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = CONFIG_I2C1_SDA_GPIO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = CONFIG_I2C1_SCL_GPIO,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = CONFIG_I2C1_FREQ_HZ,
+    };
+    
+    esp_err_t ret = i2c_param_config(CONFIG_I2C1_PORT, &conf);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure I2C for MPU6050: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ret = i2c_driver_install(CONFIG_I2C1_PORT, conf.mode, 0, 0, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to install I2C driver for MPU6050: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Create MPU6050 device handle using the configurable I2C address
+    mpu6050_handle = mpu6050_create(CONFIG_I2C1_PORT, CONFIG_MPU6050_I2C_ADDR);
     if (mpu6050_handle == NULL) {
         ESP_LOGE(TAG, "Failed to create MPU6050 device handle");
         return ESP_FAIL;
     }
     
     // Wake up MPU6050
-    esp_err_t ret = mpu6050_wake_up(mpu6050_handle);
+    ret = mpu6050_wake_up(mpu6050_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to wake up MPU6050: %s", esp_err_to_name(ret));
         mpu6050_delete(mpu6050_handle);
@@ -322,8 +345,6 @@ bool mpu6050_is_tap_detected(void)
     return module_initialized ? motion_status.tap_detected : false;
 }
 
-// Tilt detection function removed
-
 esp_err_t mpu6050_module_deinit(void)
 {
     ESP_LOGI(TAG, "Deinitializing MPU6050 module...");
@@ -345,7 +366,8 @@ esp_err_t mpu6050_module_deinit(void)
         mpu6050_handle = NULL;
     }
     
-    // Don't delete I2C driver - shared with time_module
+    // Delete dedicated I2C driver for MPU6050
+    i2c_driver_delete(CONFIG_I2C1_PORT);
     
     module_initialized = false;
     ESP_LOGI(TAG, "MPU6050 module deinitialized");

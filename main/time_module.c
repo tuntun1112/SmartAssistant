@@ -1,5 +1,6 @@
 #include "time_module.h"
 #include "display_module.h"
+#include "project_config.h"
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <sys/time.h>
@@ -9,11 +10,11 @@
 
 static const char *TAG = "TimeModule";
 
-// DS3231 RTC I2C configuration
-#define DS3231_I2C_ADDR         0x68
-#define DS3231_I2C_PORT         I2C_NUM_0
-#define DS3231_SDA_GPIO         GPIO_NUM_8
-#define DS3231_SCL_GPIO         GPIO_NUM_18
+// DS3231 RTC I2C configuration - use centralized config
+#define DS3231_I2C_ADDR         CONFIG_DS3231_I2C_ADDR
+#define DS3231_I2C_PORT         CONFIG_I2C0_PORT
+#define DS3231_SDA_GPIO         CONFIG_I2C0_SDA_GPIO
+#define DS3231_SCL_GPIO         CONFIG_I2C0_SCL_GPIO
 #define DS3231_I2C_FREQ_HZ      100000
 
 // DS3231 register addresses
@@ -29,8 +30,11 @@ static const char *TAG = "TimeModule";
 static bool module_initialized = false;
 static bool rtc_available = false;
 static time_status_t current_status = TIME_STATUS_NOT_SET;
-static esp_timer_handle_t update_timer = NULL;
 static time_info_t last_known_time = {0};
+static TaskHandle_t time_update_task_handle = NULL;
+static bool time_update_running = false;
+
+// Using old I2C driver for compatibility with MPU6050
 
 // Forward declarations
 static esp_err_t ds3231_init(void);
@@ -38,25 +42,25 @@ static esp_err_t ds3231_read_time(time_info_t *time_info);
 static esp_err_t ds3231_write_time(const time_info_t *time_info);
 static uint8_t bcd_to_dec(uint8_t val);
 static uint8_t dec_to_bcd(uint8_t val);
-static void time_update_timer_callback(void *arg);
-static void update_display_with_current_time(void);
+// Removed unused function declarations to fix compilation warnings
 
 static esp_err_t ds3231_init(void)
 {
-    ESP_LOGI(TAG, "Initializing DS3231 RTC on I2C pins SDA:%d, SCL:%d", DS3231_SDA_GPIO, DS3231_SCL_GPIO);
+    ESP_LOGI(TAG, "Initializing DS3231 RTC with legacy I2C API on pins SDA:%d, SCL:%d", DS3231_SDA_GPIO, DS3231_SCL_GPIO);
     
+    // Configure I2C
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
         .sda_io_num = DS3231_SDA_GPIO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_io_num = DS3231_SCL_GPIO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
         .master.clk_speed = DS3231_I2C_FREQ_HZ,
     };
     
     esp_err_t ret = i2c_param_config(DS3231_I2C_PORT, &conf);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure I2C: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to configure I2C parameters: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -66,7 +70,7 @@ static esp_err_t ds3231_init(void)
         return ret;
     }
     
-    // Test communication with DS3231
+    // Test communication with DS3231 - read seconds register
     uint8_t test_data;
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
@@ -80,7 +84,7 @@ static esp_err_t ds3231_init(void)
     i2c_cmd_link_delete(cmd);
     
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "DS3231 RTC communication test successful");
+        ESP_LOGI(TAG, "DS3231 RTC communication test successful (seconds reg: 0x%02x)", test_data);
         rtc_available = true;
         current_status = TIME_STATUS_OK;
         
@@ -211,26 +215,40 @@ static esp_err_t ds3231_write_time(const time_info_t *time_info)
     return ESP_OK;
 }
 
-static void time_update_timer_callback(void *arg)
+static void time_update_task(void *arg)
 {
-    update_display_with_current_time();
+    ESP_LOGI(TAG, "Time update task started with legacy I2C API");
+    
+    while (time_update_running) {
+        if (rtc_available) {
+            time_info_t current_time;
+            esp_err_t ret = ds3231_read_time(&current_time);
+            
+            if (ret == ESP_OK) {
+                // Update display with real time from RTC
+                display_update_time(current_time.hour, current_time.minute, current_time.second);
+                display_update_date(current_time.year, current_time.month, current_time.day);
+                ESP_LOGI(TAG, "Display updated: %04d-%02d-%02d %02d:%02d:%02d", 
+                         current_time.year, current_time.month, current_time.day,
+                         current_time.hour, current_time.minute, current_time.second);
+            } else {
+                ESP_LOGW(TAG, "Failed to read time from RTC, keeping previous display");
+            }
+        } else {
+            ESP_LOGW(TAG, "RTC not available, skipping time update");
+        }
+        
+        // Update every second
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    
+    ESP_LOGI(TAG, "Time update task ending");
+    time_update_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
-static void update_display_with_current_time(void)
-{
-    time_info_t current_time;
-    esp_err_t ret = time_module_get_time(&current_time);
-    
-    if (ret == ESP_OK && current_time.status == TIME_STATUS_OK) {
-        // Update display with current time
-        display_update_time(current_time.hour, current_time.minute, current_time.second);
-        display_update_date(current_time.year, current_time.month, current_time.day);
-    } else {
-        // Show error message in time area
-        const char* status_msg = time_module_get_status_string();
-        display_show_time_error(status_msg);
-    }
-}
+// Note: update_display_with_current_time temporarily removed as it's unused
+// due to static time display implementation
 
 esp_err_t time_module_init(void)
 {
@@ -317,44 +335,51 @@ esp_err_t time_module_start_display_updates(void)
         return ESP_FAIL;
     }
     
-    if (update_timer != NULL) {
+    if (time_update_task_handle != NULL) {
         ESP_LOGW(TAG, "Display updates already running");
         return ESP_OK;
     }
     
-    const esp_timer_create_args_t timer_args = {
-        .callback = &time_update_timer_callback,
-        .name = "time_update"
-    };
+    time_update_running = true;
     
-    esp_err_t ret = esp_timer_create(&timer_args, &update_timer);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create update timer: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    BaseType_t ret = xTaskCreate(
+        time_update_task,
+        "time_update",
+        4096,
+        NULL,
+        5,
+        &time_update_task_handle
+    );
     
-    ret = esp_timer_start_periodic(update_timer, 1000000); // 1 second
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start update timer: %s", esp_err_to_name(ret));
-        esp_timer_delete(update_timer);
-        update_timer = NULL;
-        return ret;
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create time update task");
+        time_update_running = false;
+        return ESP_FAIL;
     }
     
     ESP_LOGI(TAG, "Started periodic display updates every 1 second");
-    
-    // Update display immediately
-    update_display_with_current_time();
     
     return ESP_OK;
 }
 
 esp_err_t time_module_stop_display_updates(void)
 {
-    if (update_timer != NULL) {
-        esp_timer_stop(update_timer);
-        esp_timer_delete(update_timer);
-        update_timer = NULL;
+    if (time_update_task_handle != NULL) {
+        time_update_running = false;
+        
+        // Wait for task to finish
+        int timeout = 50; // 500ms timeout
+        while (time_update_task_handle != NULL && timeout > 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            timeout--;
+        }
+        
+        // Force delete if still running
+        if (time_update_task_handle != NULL) {
+            vTaskDelete(time_update_task_handle);
+            time_update_task_handle = NULL;
+        }
+        
         ESP_LOGI(TAG, "Stopped display updates");
     }
     
@@ -372,12 +397,12 @@ esp_err_t time_module_deinit(void)
     // Stop display updates
     time_module_stop_display_updates();
     
-    // Deinitialize I2C driver
+    // Cleanup I2C driver
     if (rtc_available) {
         i2c_driver_delete(DS3231_I2C_PORT);
-        rtc_available = false;
     }
     
+    rtc_available = false;
     module_initialized = false;
     current_status = TIME_STATUS_NOT_SET;
     

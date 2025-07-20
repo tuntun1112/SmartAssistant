@@ -453,7 +453,7 @@ static void create_main_screen(void)
     // Step 3: Position
     lv_obj_align(time_label, LV_ALIGN_CENTER, 0, -20);
     
-    ESP_LOGI(TAG, "Time label created with WHITE COLOR and DEFAULT FONT (ptr: %p)", time_label);
+    ESP_LOGD(TAG, "Time label created with white text and default font (ptr: %p)", time_label);
 
     // Date display
     date_label = lv_label_create(main_screen);
