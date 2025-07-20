@@ -15,6 +15,7 @@
 #include <lvgl.h>
 #include <stdio.h>
 #include "sdkconfig.h"
+#include "fonts/chinese_font_16.h"
 
 
 static const char *TAG = "DisplayModule";
@@ -61,16 +62,16 @@ static lv_obj_t *boot_label = NULL;
 static lv_obj_t *boot_spinner = NULL;
 static lv_obj_t *boot_status_label = NULL;
 static lv_obj_t *boot_progress_bar = NULL;
-static lv_obj_t *boot_logo_container = NULL;
 static lv_obj_t *boot_screen = NULL;
 static lv_obj_t *main_screen = NULL;
-static lv_style_t style_screen;
-static lv_style_t style_card;
-static lv_style_t style_title;
-static lv_style_t style_status_panel;
-static lv_style_t style_progress_bar;
-static lv_style_t style_logo;
 static esp_timer_handle_t lvgl_tick_timer = NULL;
+static lv_style_t style_chinese_font;
+
+// Time-related UI components for clock module integration
+static lv_obj_t *time_label = NULL;
+static lv_obj_t *date_label = NULL;
+static char current_time_str[16] = "12:34:56";
+static char current_date_str[32] = "Jul 20, 2025";
 
 // Forward declarations
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
@@ -81,9 +82,8 @@ static esp_err_t display_brightness_init(void);
 static esp_err_t initialize_spi(void);
 static esp_err_t initialize_display(void);
 static esp_err_t initialize_lvgl(void);
-static void create_boot_animation(void);
+static void create_boot_screen(void);
 static void create_main_screen(void);
-static void init_styles(void);
 static void update_boot_progress(int progress);
 
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
@@ -330,6 +330,10 @@ static esp_err_t initialize_lvgl(void)
     lv_disp_drv.user_data = lcd_handle;
     lv_display = lv_disp_drv_register(&lv_disp_drv);
 
+    ESP_LOGI(TAG, "Initializing Chinese font style");
+    lv_style_init(&style_chinese_font);
+    lv_style_set_text_font(&style_chinese_font, &lv_font_montserrat_14);
+
     ESP_LOGI(TAG, "Creating LVGL tick timer");
     const esp_timer_create_args_t lvgl_tick_timer_args =
     {
@@ -358,58 +362,6 @@ static esp_err_t initialize_lvgl(void)
     return ESP_OK;
 }
 
-static void init_styles(void)
-{
-    // Screen background style
-    lv_style_init(&style_screen);
-    lv_style_set_bg_color(&style_screen, lv_color_hex(0x0f0f23));
-    lv_style_set_bg_grad_color(&style_screen, lv_color_hex(0x1a1a3a));
-    lv_style_set_bg_grad_dir(&style_screen, LV_GRAD_DIR_VER);
-    
-    // Card style for containers
-    lv_style_init(&style_card);
-    lv_style_set_bg_color(&style_card, lv_color_hex(0x2d2d44));
-    lv_style_set_bg_opa(&style_card, LV_OPA_90);
-    lv_style_set_border_color(&style_card, lv_color_hex(0x4a4a6a));
-    lv_style_set_border_width(&style_card, 1);
-    lv_style_set_border_opa(&style_card, LV_OPA_50);
-    lv_style_set_radius(&style_card, 12);
-    lv_style_set_shadow_width(&style_card, 10);
-    lv_style_set_shadow_color(&style_card, lv_color_black());
-    lv_style_set_shadow_opa(&style_card, LV_OPA_30);
-    lv_style_set_pad_all(&style_card, 8);
-    
-    // Title style
-    lv_style_init(&style_title);
-    lv_style_set_text_color(&style_title, lv_color_white());
-    lv_style_set_text_font(&style_title, &lv_font_montserrat_14);
-    
-    // Status panel style
-    lv_style_init(&style_status_panel);
-    lv_style_set_bg_color(&style_status_panel, lv_color_hex(0x1a1a3a));
-    lv_style_set_bg_opa(&style_status_panel, LV_OPA_80);
-    lv_style_set_radius(&style_status_panel, 8);
-    lv_style_set_pad_all(&style_status_panel, 8);
-    lv_style_set_border_color(&style_status_panel, lv_color_hex(0x4CAF50));
-    lv_style_set_border_width(&style_status_panel, 1);
-    lv_style_set_border_opa(&style_status_panel, LV_OPA_50);
-    
-    // Progress bar style
-    lv_style_init(&style_progress_bar);
-    lv_style_set_bg_color(&style_progress_bar, lv_color_hex(0x4CAF50));
-    lv_style_set_bg_grad_color(&style_progress_bar, lv_color_hex(0x81C784));
-    lv_style_set_bg_grad_dir(&style_progress_bar, LV_GRAD_DIR_HOR);
-    lv_style_set_radius(&style_progress_bar, 10);
-    
-    // Logo container style
-    lv_style_init(&style_logo);
-    lv_style_set_bg_color(&style_logo, lv_color_hex(0x4CAF50));
-    lv_style_set_bg_opa(&style_logo, LV_OPA_20);
-    lv_style_set_radius(&style_logo, 50);
-    lv_style_set_border_color(&style_logo, lv_color_hex(0x4CAF50));
-    lv_style_set_border_width(&style_logo, 2);
-    lv_style_set_border_opa(&style_logo, LV_OPA_60);
-}
 
 static void update_boot_progress(int progress)
 {
@@ -418,225 +370,95 @@ static void update_boot_progress(int progress)
     }
 }
 
-static void opacity_anim_cb(void * obj, int32_t value)
-{
-    lv_obj_set_style_opa((lv_obj_t*)obj, value, LV_STATE_DEFAULT);
-}
 
-static void create_boot_animation(void)
+static void create_boot_screen(void)
 {
-    // Initialize styles first
-    init_styles();
-    
     boot_screen = lv_obj_create(NULL);
     lv_obj_clear_flag(boot_screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_style(boot_screen, &style_screen, LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(boot_screen, lv_color_black(), LV_STATE_DEFAULT);
 
-    // Create logo container with pulsing effect
-    boot_logo_container = lv_obj_create(boot_screen);
-    lv_obj_set_size(boot_logo_container, 100, 100);
-    lv_obj_align(boot_logo_container, LV_ALIGN_CENTER, 0, -80);
-    lv_obj_add_style(boot_logo_container, &style_logo, LV_STATE_DEFAULT);
-    lv_obj_clear_flag(boot_logo_container, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Create title label inside logo container
-    boot_label = lv_label_create(boot_logo_container);
-    lv_label_set_text(boot_label, "SA");
-    lv_obj_add_style(boot_label, &style_title, LV_STATE_DEFAULT);
-    lv_obj_center(boot_label);
-
-    // Create system title
     lv_obj_t *system_title = lv_label_create(boot_screen);
-    lv_label_set_text(system_title, "SmartAssistant");
-    lv_obj_add_style(system_title, &style_title, LV_STATE_DEFAULT);
-    lv_obj_align(system_title, LV_ALIGN_CENTER, 0, -20);
+    lv_label_set_text(system_title, "Smart Assistant");
+    lv_obj_set_style_text_color(system_title, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(system_title, LV_FONT_DEFAULT, LV_STATE_DEFAULT);
+    lv_obj_align(system_title, LV_ALIGN_CENTER, 0, -30);
 
-    // Create progress bar
     boot_progress_bar = lv_bar_create(boot_screen);
-    lv_obj_set_size(boot_progress_bar, 280, 8);
-    lv_obj_align(boot_progress_bar, LV_ALIGN_CENTER, 0, 20);
-    lv_obj_add_style(boot_progress_bar, &style_progress_bar, LV_PART_INDICATOR);
+    lv_obj_set_size(boot_progress_bar, 200, 8);
+    lv_obj_align(boot_progress_bar, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(boot_progress_bar, lv_color_hex(0x333333), LV_PART_MAIN);
-    lv_obj_set_style_radius(boot_progress_bar, 4, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(boot_progress_bar, lv_color_white(), LV_PART_INDICATOR);
     lv_bar_set_range(boot_progress_bar, 0, 100);
     lv_bar_set_value(boot_progress_bar, 0, LV_ANIM_OFF);
 
-    // Create status panel
-    lv_obj_t *status_panel = lv_obj_create(boot_screen);
-    lv_obj_set_size(status_panel, 300, 50);
-    lv_obj_align(status_panel, LV_ALIGN_CENTER, 0, 65);
-    lv_obj_add_style(status_panel, &style_status_panel, LV_STATE_DEFAULT);
-    lv_obj_clear_flag(status_panel, LV_OBJ_FLAG_SCROLLABLE);
+    boot_status_label = lv_label_create(boot_screen);
+    lv_label_set_text(boot_status_label, "Starting...");
+    lv_obj_set_style_text_color(boot_status_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(boot_status_label, &style_chinese_font, 0);
+    lv_obj_align(boot_status_label, LV_ALIGN_CENTER, 0, 30);
 
-    // Create status label inside panel
-    boot_status_label = lv_label_create(status_panel);
-    lv_label_set_text(boot_status_label, "Initializing System...");
-    lv_obj_add_style(boot_status_label, &style_title, LV_STATE_DEFAULT);
-    lv_obj_center(boot_status_label);
-
-    // Create pulsing animation for logo using opacity
-    lv_anim_t pulse_anim;
-    lv_anim_init(&pulse_anim);
-    lv_anim_set_var(&pulse_anim, boot_logo_container);
-    lv_anim_set_exec_cb(&pulse_anim, opacity_anim_cb);
-    lv_anim_set_values(&pulse_anim, LV_OPA_50, LV_OPA_100);
-    lv_anim_set_time(&pulse_anim, 1000);
-    lv_anim_set_repeat_count(&pulse_anim, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_playback_time(&pulse_anim, 1000);
-    lv_anim_start(&pulse_anim);
-
-    // Load boot screen
     lv_scr_load(boot_screen);
 
-    ESP_LOGI(TAG, "Modern boot animation created");
+    ESP_LOGI(TAG, "Simple boot screen created");
 }
 
 static void create_main_screen(void)
 {
     main_screen = lv_obj_create(NULL);
     lv_obj_clear_flag(main_screen, LV_OBJ_FLAG_SCROLLABLE);
-    // lv_obj_set_style_bg_color(main_screen, lv_color_hex(0xf0f0f0), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(main_screen, lv_color_hex(0xF8E8D0), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(main_screen, lv_color_black(), LV_STATE_DEFAULT);
 
-    // Motion recognition status card (top-left)
-    lv_obj_t *motion_card = lv_obj_create(main_screen);
-    lv_obj_set_size(motion_card, 200, 70);
-    lv_obj_align(motion_card, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_set_style_bg_color(motion_card, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(motion_card, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(motion_card, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(motion_card, 10, LV_STATE_DEFAULT);
-    lv_obj_clear_flag(motion_card, LV_OBJ_FLAG_SCROLLABLE);
+    // Motion status (top-left)
+    lv_obj_t *motion_text = lv_label_create(main_screen);
+    lv_label_set_text(motion_text, "Motion: PC");
+    lv_obj_set_style_text_color(motion_text, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(motion_text, &style_chinese_font, 0);
+    lv_obj_align(motion_text, LV_ALIGN_TOP_LEFT, 10, 10);
 
-    // Motion recognition header
-    lv_obj_t *motion_header = lv_label_create(motion_card);
-    lv_label_set_text(motion_header, "motion recognition model working!");
-    lv_obj_set_style_text_color(motion_header, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(motion_header, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(motion_header, LV_ALIGN_TOP_LEFT, 8, 3);
+    // Weather info (top-right)
+    lv_obj_t *weather_text = lv_label_create(main_screen);
+    lv_label_set_text(weather_text, "21C Rainy");
+    lv_obj_set_style_text_color(weather_text, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(weather_text, &style_chinese_font, 0);
+    lv_obj_align(weather_text, LV_ALIGN_TOP_RIGHT, -10, 10);
 
-    // Computer icon and status
-    lv_obj_t *computer_status = lv_label_create(motion_card);
-    lv_label_set_text(computer_status, "Using computer 🖥️");
-    lv_obj_set_style_text_color(computer_status, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(computer_status, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(computer_status, LV_ALIGN_TOP_LEFT, 8, 20);
-
-    // Accuracy and time
-    lv_obj_t *accuracy_label = lv_label_create(motion_card);
-    lv_label_set_text(accuracy_label, "94%accuracy");
-    lv_obj_set_style_text_color(accuracy_label, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(accuracy_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(accuracy_label, LV_ALIGN_BOTTOM_LEFT, 8, -3);
-
-    lv_obj_t *time_ago = lv_label_create(motion_card);
-    lv_label_set_text(time_ago, "125 minutes ago");
-    lv_obj_set_style_text_color(time_ago, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(time_ago, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(time_ago, LV_ALIGN_BOTTOM_RIGHT, -8, -3);
-
-    // Weather card (top-right)
-    lv_obj_t *weather_card = lv_obj_create(main_screen);
-    lv_obj_set_size(weather_card, 200, 70);
-    lv_obj_align(weather_card, LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_set_style_bg_color(weather_card, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(weather_card, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(weather_card, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(weather_card, 10, LV_STATE_DEFAULT);
-    lv_obj_clear_flag(weather_card, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Weather temperature
-    lv_obj_t *weather_temp = lv_label_create(weather_card);
-    lv_label_set_text(weather_temp, "21°C / RAIN");
-    lv_obj_set_style_text_color(weather_temp, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(weather_temp, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(weather_temp, LV_ALIGN_TOP_RIGHT, -8, 8);
-
-    // Cloud icon
-    lv_obj_t *cloud_icon = lv_label_create(weather_card);
-    lv_label_set_text(cloud_icon, "🌧️");
-    lv_obj_set_style_text_color(cloud_icon, lv_color_hex(0x666666), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(cloud_icon, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(cloud_icon, LV_ALIGN_TOP_RIGHT, -8, 25);
-
-    // Location
-    lv_obj_t *location_label = lv_label_create(weather_card);
-    lv_label_set_text(location_label, "Taiwan Taoyuan Luzhu");
-    lv_obj_set_style_text_color(location_label, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(location_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(location_label, LV_ALIGN_BOTTOM_RIGHT, -8, -3);
-
-    // VERY LARGE time display with seconds (center) - 使用較大字體
-    lv_obj_t *time_label = lv_label_create(main_screen);
-    lv_label_set_text(time_label, "12:34:56");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x333333), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    // 使用 transform zoom 放大顯示
-    lv_obj_set_style_transform_zoom(time_label, 300, LV_STATE_DEFAULT);
-    lv_obj_align(time_label, LV_ALIGN_CENTER, -20, -40);
-
-    // 新增分隔線於時間下方
-    static lv_point_t time_line_points[] = {{0,0}, {300,0}};
-    lv_obj_t *time_line = lv_line_create(main_screen);
-    lv_line_set_points(time_line, time_line_points, 2);
-    lv_obj_set_style_line_width(time_line, 2, LV_PART_MAIN);
-    lv_obj_set_style_line_color(time_line, lv_color_hex(0x666666), LV_STATE_DEFAULT);
-    lv_obj_align(time_line, LV_ALIGN_CENTER, 0, -10);
-
-    // AM/PM indicator
-    lv_obj_t *ampm_label = lv_label_create(main_screen);
-    lv_label_set_text(ampm_label, "AM");
-    lv_obj_set_style_text_color(ampm_label, lv_color_hex(0x333333), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ampm_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(ampm_label, LV_ALIGN_CENTER, 100, -40);
+    // Large time display (center) - USE SAME FONT AS OTHER LABELS
+    time_label = lv_label_create(main_screen);
+    lv_label_set_text(time_label, current_time_str);
+    
+    // Step 1: Add white color for visibility  
+    lv_obj_set_style_text_color(time_label, lv_color_white(), LV_STATE_DEFAULT);
+    
+    // Step 2: Use same font style as other labels for consistency
+    lv_obj_add_style(time_label, &style_chinese_font, 0);
+    
+    // Step 3: Position
+    lv_obj_align(time_label, LV_ALIGN_CENTER, 0, -20);
+    
+    ESP_LOGI(TAG, "Time label created with WHITE COLOR and DEFAULT FONT (ptr: %p)", time_label);
 
     // Date display
-    lv_obj_t *date_label = lv_label_create(main_screen);
-    lv_label_set_text(date_label, "2025/07/17");
-    lv_obj_set_style_text_color(date_label, lv_color_hex(0x666666), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(date_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(date_label, LV_ALIGN_CENTER, 0, -10);
+    date_label = lv_label_create(main_screen);
+    lv_label_set_text(date_label, current_date_str);
+    lv_obj_set_style_text_color(date_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(date_label, &style_chinese_font, 0);
+    lv_obj_align(date_label, LV_ALIGN_CENTER, 0, 40);
 
-    // Notification status (center)
-    lv_obj_t *notification_label = lv_label_create(main_screen);
-    lv_label_set_text(notification_label, "YOU DON'T HAVE ANY NOTIFICATIONS");
-    lv_obj_set_style_text_color(notification_label, lv_color_hex(0x666666), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(notification_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(notification_label, LV_ALIGN_CENTER, 0, 30);
+    // Assistant status (bottom-left)
+    lv_obj_t *assistant_text = lv_label_create(main_screen);
+    lv_label_set_text(assistant_text, "Assistant");
+    lv_obj_set_style_text_color(assistant_text, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(assistant_text, &style_chinese_font, 0);
+    lv_obj_align(assistant_text, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 
-    // Speech bubble (bottom-left)
-    lv_obj_t *speech_bubble = lv_obj_create(main_screen);
-    lv_obj_set_size(speech_bubble, 200, 50);
-    lv_obj_align(speech_bubble, LV_ALIGN_BOTTOM_LEFT, 10, -60);
-    lv_obj_set_style_bg_color(speech_bubble, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(speech_bubble, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(speech_bubble, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(speech_bubble, 15, LV_STATE_DEFAULT);
-    lv_obj_clear_flag(speech_bubble, LV_OBJ_FLAG_SCROLLABLE);
+    // WiFi status (bottom-right)
+    lv_obj_t *wifi_text = lv_label_create(main_screen);
+    lv_label_set_text(wifi_text, "WiFi: OK");
+    lv_obj_set_style_text_color(wifi_text, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(wifi_text, &style_chinese_font, 0);
+    lv_obj_align(wifi_text, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
-    // Speech text
-    lv_obj_t *speech_text = lv_label_create(speech_bubble);
-    lv_label_set_text(speech_text, "HOW CAN I\nHELP YOU TODAY?");
-    lv_obj_set_style_text_color(speech_text, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(speech_text, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_align(speech_text, LV_TEXT_ALIGN_CENTER, LV_STATE_DEFAULT);
-    lv_obj_center(speech_text);
-
-    // Cat emoji (below speech bubble)
-    lv_obj_t *cat_emoji = lv_label_create(main_screen);
-    lv_label_set_text(cat_emoji, "😺");
-    lv_obj_set_style_text_color(cat_emoji, lv_color_black(), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(cat_emoji, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(cat_emoji, LV_ALIGN_BOTTOM_LEFT, 30, -30);
-
-    // API connection status (bottom-right)
-    lv_obj_t *api_status = lv_label_create(main_screen);
-    lv_label_set_text(api_status, "● ALL API is Connected");
-    lv_obj_set_style_text_color(api_status, lv_color_hex(0x4CAF50), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(api_status, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_align(api_status, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-
-    ESP_LOGI(TAG, "Fixed main screen layout to match design better");
+    ESP_LOGI(TAG, "Simple main screen created");
 }
 
 void display_update_boot_status(const char* status_text, int progress)
@@ -666,7 +488,6 @@ void display_complete_boot_animation(void)
     boot_spinner = NULL;
     boot_status_label = NULL;
     boot_progress_bar = NULL;
-    boot_logo_container = NULL;
 }
 
 esp_err_t display_init_and_show_boot_animation(void)
@@ -704,7 +525,7 @@ esp_err_t display_init_and_show_boot_animation(void)
         return ret;
     }
     
-    create_boot_animation();
+    create_boot_screen();
     
     // Give LVGL time to render the boot screen
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -720,6 +541,46 @@ esp_err_t display_init_and_show_boot_animation(void)
 void display_task_handler(void)
 {
     lv_timer_handler();
+}
+
+void display_update_time(int hours, int minutes, int seconds)
+{
+    if (time_label != NULL) {
+        snprintf(current_time_str, sizeof(current_time_str), "%02d:%02d:%02d", hours, minutes, seconds);
+        lv_label_set_text(time_label, current_time_str);
+        ESP_LOGI(TAG, "Time updated: %s (label ptr: %p)", current_time_str, time_label);
+    } else {
+        ESP_LOGE(TAG, "Time label is NULL!");
+    }
+}
+
+void display_update_date(int year, int month, int day)
+{
+    if (date_label != NULL) {
+        const char* month_names[] = {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+        
+        if (month >= 1 && month <= 12) {
+            snprintf(current_date_str, sizeof(current_date_str), "%s %d, %d", 
+                     month_names[month-1], day, year);
+            lv_label_set_text(date_label, current_date_str);
+            ESP_LOGI(TAG, "Date updated: %s", current_date_str);
+        }
+    }
+}
+
+void display_show_time_error(const char* error_message)
+{
+    if (time_label != NULL) {
+        lv_label_set_text(time_label, error_message);
+        ESP_LOGI(TAG, "Time error displayed: %s", error_message);
+    }
+    if (date_label != NULL) {
+        lv_label_set_text(date_label, "RTC Error");
+        ESP_LOGI(TAG, "Date error displayed");
+    }
 }
 
 esp_err_t display_deinit(void)
@@ -769,9 +630,10 @@ esp_err_t display_deinit(void)
     boot_spinner = NULL;
     boot_status_label = NULL;
     boot_progress_bar = NULL;
-    boot_logo_container = NULL;
     boot_screen = NULL;
     main_screen = NULL;
+    time_label = NULL;
+    date_label = NULL;
     
     ESP_LOGI(TAG, "Display system deinitialized successfully");
     return ESP_OK;
