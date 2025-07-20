@@ -20,7 +20,7 @@ void app_main(void)
     }
     
     // Simulate boot process with status updates
-    display_update_boot_status("Display initialized...");
+    display_update_boot_status("Display initialized...", 10);
     vTaskDelay(pdMS_TO_TICKS(500));
     
     // Give LVGL time to update the display
@@ -29,31 +29,31 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("Checking hardware...");
+    display_update_boot_status("Checking hardware...", 30);
     for (int i = 0; i < 15; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("Loading configuration...");
+    display_update_boot_status("Loading configuration...", 50);
     for (int i = 0; i < 10; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("Connecting to WiFi...");
+    display_update_boot_status("Connecting to WiFi...", 70);
     for (int i = 0; i < 20; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("Starting services...");
+    display_update_boot_status("Starting services...", 90);
     for (int i = 0; i < 10; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("System ready!");
+    display_update_boot_status("System ready!", 100);
     for (int i = 0; i < 10; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
