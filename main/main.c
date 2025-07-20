@@ -3,27 +3,25 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "display_module.h"
+#include "time_module.h"
+#include "pir_module.h"
+#include "mpu6050_module.h"
 
 static const char *TAG = "SmartAssistant";
 
-void app_main(void)
+static esp_err_t run_boot_sequence(void)
 {
-    ESP_LOGI(TAG, "Smart Assistant starting...");
+    ESP_LOGI(TAG, "Starting boot sequence...");
     
-    // Initialize display system and show boot animation
     esp_err_t ret = display_init_and_show_boot_animation();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize display system: %s", esp_err_to_name(ret));
-        ESP_LOGE(TAG, "System initialization failed, restarting in 5 seconds...");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        esp_restart();
+        return ret;
     }
     
-    // Simulate boot process with status updates
     display_update_boot_status("Display initialized...", 10);
     vTaskDelay(pdMS_TO_TICKS(500));
     
-    // Give LVGL time to update the display
     for (int i = 0; i < 5; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -37,6 +35,36 @@ void app_main(void)
     
     display_update_boot_status("Loading configuration...", 50);
     for (int i = 0; i < 10; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
+    display_update_boot_status("Initializing time module...", 60);
+    esp_err_t time_ret = time_module_init();
+    if (time_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Time module initialization failed, continuing without RTC");
+    }
+    for (int i = 0; i < 10; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
+    display_update_boot_status("Initializing PIR sensor...", 65);
+    esp_err_t pir_ret = pir_module_init();
+    if (pir_ret != ESP_OK) {
+        ESP_LOGW(TAG, "PIR module initialization failed, continuing without PIR sensor");
+    }
+    for (int i = 0; i < 5; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
+    display_update_boot_status("Initializing motion sensor...", 67);
+    esp_err_t mpu_ret = mpu6050_module_init();
+    if (mpu_ret != ESP_OK) {
+        ESP_LOGW(TAG, "MPU6050 module initialization failed, continuing without motion sensor");
+    }
+    for (int i = 0; i < 3; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -59,15 +87,58 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    // Complete boot animation and show main screen
     display_complete_boot_animation();
     
-    ESP_LOGI(TAG, "System initialized successfully");
+    // Start time display updates
+    esp_err_t time_update_ret = time_module_start_display_updates();
+    if (time_update_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to start time display updates");
+    }
+    
+    ESP_LOGI(TAG, "Boot sequence completed successfully");
+    
+    return ESP_OK;
+}
 
-    // Main application loop
-    while (1)
-    {
+static void run_main_screen(void)
+{
+    ESP_LOGI(TAG, "Starting main screen...");
+    
+    uint32_t sensor_update_counter = 0;
+    
+    while (1) {
         vTaskDelay(pdMS_TO_TICKS(10));
         display_task_handler();
+        
+        // Update sensor status every 500ms (50 * 10ms)
+        sensor_update_counter++;
+        if (sensor_update_counter >= 50) {
+            sensor_update_counter = 0;
+            
+            // Update PIR status
+            char pir_status_str[32];
+            if (pir_get_status_string(pir_status_str, sizeof(pir_status_str)) == ESP_OK) {
+                display_update_pir_status(pir_status_str);
+            }
+            
+            // Update Motion status
+            char motion_status_str[32];
+            if (mpu6050_get_status_string(motion_status_str, sizeof(motion_status_str)) == ESP_OK) {
+                display_update_motion_status(motion_status_str);
+            }
+        }
     }
+}
+
+void app_main(void)
+{
+    ESP_LOGI(TAG, "Smart Assistant starting...");
+    
+    if (run_boot_sequence() != ESP_OK) {
+        ESP_LOGE(TAG, "System initialization failed, restarting in 5 seconds...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        esp_restart();
+    }
+    
+    run_main_screen();
 }

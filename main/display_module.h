@@ -51,6 +51,45 @@ void display_complete_boot_animation(void);
 void display_task_handler(void);
 
 /**
+ * @brief Update the time display on the main screen
+ * 
+ * @param hours Hours (0-23)
+ * @param minutes Minutes (0-59) 
+ * @param seconds Seconds (0-59)
+ */
+void display_update_time(int hours, int minutes, int seconds);
+
+/**
+ * @brief Update the date display on the main screen
+ * 
+ * @param year Year (e.g. 2025)
+ * @param month Month (1-12)
+ * @param day Day (1-31)
+ */
+void display_update_date(int year, int month, int day);
+
+/**
+ * @brief Show error message in time display area
+ * 
+ * @param error_message Error message to display
+ */
+void display_show_time_error(const char* error_message);
+
+/**
+ * @brief Update PIR sensor status display
+ * 
+ * @param pir_status_text PIR status text to display (e.g., "PIR: Yes" or "PIR: No (10s ago)")
+ */
+void display_update_pir_status(const char* pir_status_text);
+
+/**
+ * @brief Update Motion sensor status display
+ * 
+ * @param motion_status_text Motion status text to display (e.g., "Motion: Shake" or "Motion: None")
+ */
+void display_update_motion_status(const char* motion_status_text);
+
+/**
  * @brief Deinitialize the display system and free resources
  * 
  * This function cleans up all resources allocated by the display system:

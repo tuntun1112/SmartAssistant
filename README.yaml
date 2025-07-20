@@ -80,11 +80,6 @@ hardware:  # 硬體
         touch: XPT2046
       sensors:
         - MPU-6050  # 3‑axis IMU
-        - INMP441   # I2S microphone
-        - MAX98357  # I2S amplifier
-        - speaker:
-            power: "3W"
-            impedance: "4Ω"
         - DS3231    # RTC module
         - SD_card
         - HC-SR505  # PIR
@@ -93,7 +88,13 @@ hardware:  # 硬體
     name: Orange_Pi_One
     ram: 512MB
     peripherals:
-      camera: GC2033  # 2 MP
+       camera: GC2033  # 2 MP
+       sensors:    
+        - INMP441   # I2S microphone
+        - MAX98357  # I2S amplifier
+        - speaker:
+            power: "3W"
+            impedance: "4Ω"
 
 gpio_map:  # GPIO 映射
   ili9488:
@@ -104,6 +105,15 @@ gpio_map:  # GPIO 映射
     TFT_RESET: GPIO_NUM_46
     TFT_DC:    GPIO_NUM_9
     TFT_BACKLIGHT: GPIO_NUM_12
+  ds3231:
+    I2C0_SDA: GPIO_NUM_8   # DS3231 RTC
+    I2C0_SCL: GPIO_NUM_18  # DS3231 RTC
+  mpu6050:
+    SDA: GPIO_NUM_5   # I2C1數據線（獨立匯流排）
+    SCL: GPIO_NUM_6   # I2C1時鐘線（獨立匯流排）
+    I2C_ADDRESS: 0x69 # MPU-6050的I2C地址（AD0接高電平）
+  hc_sr505:
+    PIR_OUTPUT: GPIO_NUM_7
 
 environment:  # 開發環境
   os: Windows_11_Pro
@@ -113,7 +123,7 @@ environment:  # 開發環境
 ai_dev_rules:  # AI 開發規則
   - "編譯通常使用官方【構建項目】按鈕，請勿自創腳本或全域安裝套件"
   - "如已有官方/認證驅動，請勿重造輪胎"
-  - "遇到問題先搜尋社群或使用 Zen MCP 與專家討論"
+  - "遇到問題難以解決或應該有更好辦法時，先搜尋網路資源或使用 Zen MCP 與專家討論"
   - "需求不清或多解方案時提出選項詢問用戶"
   - "此專案為高中自主學習，目標為 MVP、功能導向、邏輯清晰"
 
