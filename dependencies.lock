@@ -9,6 +9,16 @@ dependencies:
       path: .
       type: git
     version: 6577e7a0668cf1364b5eb1fc2115c9a367d3623e
+  espressif/mpu6050:
+    component_hash: d69219ccb141372b863c511749ffbeab28417ac71c205d7ed7030c308e1b6832
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.0
   idf:
     source:
       type: idf
@@ -22,8 +32,9 @@ dependencies:
     version: 8.4.0
 direct_dependencies:
 - esp_lcd_ili9488
+- espressif/mpu6050
 - idf
 - lvgl/lvgl
-manifest_hash: 41d4e4d73f29859587ab00c5b63fc373f804210893cabc71219cf106fc47d8ee
+manifest_hash: a8b8f4c4a13d9f71d159acf7e5d03a19d9997ee5caffb345bfe2940049ea1efe
 target: esp32s3
 version: 2.0.0

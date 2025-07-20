@@ -3,3 +3,4 @@ dependencies:
   lvgl/lvgl: "<9.0.0"
   esp_lcd_ili9488:
     git: https://github.com/atanisoft/esp_lcd_ili9488.git
+  espressif/mpu6050: "^1.2.0"

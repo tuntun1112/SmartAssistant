@@ -83,6 +83,13 @@ void display_show_time_error(const char* error_message);
 void display_update_pir_status(const char* pir_status_text);
 
 /**
+ * @brief Update Motion sensor status display
+ * 
+ * @param motion_status_text Motion status text to display (e.g., "Motion: Shake" or "Motion: None")
+ */
+void display_update_motion_status(const char* motion_status_text);
+
+/**
  * @brief Deinitialize the display system and free resources
  * 
  * This function cleans up all resources allocated by the display system:

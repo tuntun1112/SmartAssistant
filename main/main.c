@@ -5,6 +5,7 @@
 #include "display_module.h"
 #include "time_module.h"
 #include "pir_module.h"
+#include "mpu6050_module.h"
 
 static const char *TAG = "SmartAssistant";
 
@@ -58,6 +59,16 @@ static esp_err_t run_boot_sequence(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
+    display_update_boot_status("Initializing motion sensor...", 67);
+    esp_err_t mpu_ret = mpu6050_module_init();
+    if (mpu_ret != ESP_OK) {
+        ESP_LOGW(TAG, "MPU6050 module initialization failed, continuing without motion sensor");
+    }
+    for (int i = 0; i < 3; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
     display_update_boot_status("Connecting to WiFi...", 70);
     for (int i = 0; i < 20; i++) {
         display_task_handler();
@@ -93,20 +104,27 @@ static void run_main_screen(void)
 {
     ESP_LOGI(TAG, "Starting main screen...");
     
-    uint32_t pir_update_counter = 0;
+    uint32_t sensor_update_counter = 0;
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10));
         display_task_handler();
         
-        // Update PIR status every 500ms (50 * 10ms)
-        pir_update_counter++;
-        if (pir_update_counter >= 50) {
-            pir_update_counter = 0;
+        // Update sensor status every 500ms (50 * 10ms)
+        sensor_update_counter++;
+        if (sensor_update_counter >= 50) {
+            sensor_update_counter = 0;
             
+            // Update PIR status
             char pir_status_str[32];
             if (pir_get_status_string(pir_status_str, sizeof(pir_status_str)) == ESP_OK) {
                 display_update_pir_status(pir_status_str);
+            }
+            
+            // Update Motion status
+            char motion_status_str[32];
+            if (mpu6050_get_status_string(motion_status_str, sizeof(motion_status_str)) == ESP_OK) {
+                display_update_motion_status(motion_status_str);
             }
         }
     }

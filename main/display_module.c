@@ -75,6 +75,7 @@ static char current_date_str[32] = "Jul 20, 2025";
 
 // PIR sensor status UI component
 static lv_obj_t *pir_status_label = NULL;
+static lv_obj_t *motion_status_label = NULL;
 
 // Forward declarations
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
@@ -411,19 +412,26 @@ static void create_main_screen(void)
     lv_obj_clear_flag(main_screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(main_screen, lv_color_black(), LV_STATE_DEFAULT);
 
-    // Motion status (top-left)
+    // Action recognition status (top-left)
     lv_obj_t *motion_text = lv_label_create(main_screen);
-    lv_label_set_text(motion_text, "Motion: PC");
+    lv_label_set_text(motion_text, "Action: PC");
     lv_obj_set_style_text_color(motion_text, lv_color_white(), LV_STATE_DEFAULT);
     lv_obj_add_style(motion_text, &style_chinese_font, 0);
     lv_obj_align(motion_text, LV_ALIGN_TOP_LEFT, 10, 10);
 
-    // PIR sensor status (top-left, below motion)
+    // PIR sensor status (top-left, below action)
     pir_status_label = lv_label_create(main_screen);
     lv_label_set_text(pir_status_label, "PIR: No");
     lv_obj_set_style_text_color(pir_status_label, lv_color_white(), LV_STATE_DEFAULT);
     lv_obj_add_style(pir_status_label, &style_chinese_font, 0);
     lv_obj_align(pir_status_label, LV_ALIGN_TOP_LEFT, 10, 30);
+
+    // MPU6050 motion sensor status (below PIR status)
+    motion_status_label = lv_label_create(main_screen);
+    lv_label_set_text(motion_status_label, "MPU: None");
+    lv_obj_set_style_text_color(motion_status_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(motion_status_label, &style_chinese_font, 0);
+    lv_obj_align(motion_status_label, LV_ALIGN_TOP_LEFT, 10, 50);
 
     // Weather info (top-right)
     lv_obj_t *weather_text = lv_label_create(main_screen);
@@ -600,6 +608,16 @@ void display_update_pir_status(const char* pir_status_text)
         ESP_LOGD(TAG, "PIR status updated: %s", pir_status_text);
     } else {
         ESP_LOGW(TAG, "PIR status label is NULL or invalid text provided");
+    }
+}
+
+void display_update_motion_status(const char* motion_status_text)
+{
+    if (motion_status_label != NULL && motion_status_text != NULL) {
+        lv_label_set_text(motion_status_label, motion_status_text);
+        ESP_LOGD(TAG, "Motion status updated: %s", motion_status_text);
+    } else {
+        ESP_LOGW(TAG, "Motion status label is NULL or invalid text provided");
     }
 }
 
