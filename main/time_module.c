@@ -164,15 +164,17 @@ static esp_err_t ds3231_read_time(time_info_t *time_info)
     time_info->year = 2000 + bcd_to_dec(data[6]);
     time_info->status = TIME_STATUS_OK;
     
-    ESP_LOGI(TAG, "Raw data: %02x %02x %02x %02x %02x %02x %02x", 
-             data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
-    
     current_status = TIME_STATUS_OK;
     last_known_time = *time_info;
     
-    ESP_LOGI(TAG, "Time read: %04d-%02d-%02d %02d:%02d:%02d", 
-             time_info->year, time_info->month, time_info->day,
-             time_info->hour, time_info->minute, time_info->second);
+    // Only log time changes on the minute to reduce serial output
+    static int last_logged_minute = -1;
+    if (time_info->minute != last_logged_minute) {
+        ESP_LOGI(TAG, "Time: %04d-%02d-%02d %02d:%02d:%02d", 
+                 time_info->year, time_info->month, time_info->day,
+                 time_info->hour, time_info->minute, time_info->second);
+        last_logged_minute = time_info->minute;
+    }
     
     return ESP_OK;
 }
@@ -227,9 +229,8 @@ static void time_update_task(void *arg)
                 // Update display with real time from RTC
                 display_update_time(current_time.hour, current_time.minute, current_time.second);
                 display_update_date(current_time.year, current_time.month, current_time.day);
-                ESP_LOGI(TAG, "Display updated: %04d-%02d-%02d %02d:%02d:%02d", 
-                         current_time.year, current_time.month, current_time.day,
-                         current_time.hour, current_time.minute, current_time.second);
+                
+                // Display module will handle its own logging, no need to duplicate here
             } else {
                 ESP_LOGW(TAG, "Failed to read time from RTC, keeping previous display");
             }

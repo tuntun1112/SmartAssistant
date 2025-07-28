@@ -6,6 +6,7 @@
 #include "time_module.h"
 #include "pir_module.h"
 #include "mpu6050_module.h"
+#include "wifi_module.h"
 
 static const char *TAG = "SmartAssistant";
 
@@ -69,8 +70,27 @@ static esp_err_t run_boot_sequence(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     
-    display_update_boot_status("Connecting to WiFi...", 70);
-    for (int i = 0; i < 20; i++) {
+    display_update_boot_status("Initializing WiFi...", 70);
+    esp_err_t wifi_ret = wifi_module_init();
+    if (wifi_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Wi-Fi module initialization failed, continuing without Wi-Fi");
+    }
+    for (int i = 0; i < 5; i++) {
+        display_task_handler();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
+    display_update_boot_status("Starting WiFi connection...", 75);
+    if (wifi_ret == ESP_OK) {
+        esp_err_t connect_ret = wifi_module_connect();
+        if (connect_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Wi-Fi connection start failed");
+        } else {
+            ESP_LOGI(TAG, "Wi-Fi connection started in background");
+        }
+    }
+    // Reduced delay since WiFi connection is now non-blocking
+    for (int i = 0; i < 5; i++) {
         display_task_handler();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -105,6 +125,7 @@ static void run_main_screen(void)
     ESP_LOGI(TAG, "Starting main screen...");
     
     uint32_t sensor_update_counter = 0;
+    uint32_t wifi_update_counter = 0;
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -125,6 +146,17 @@ static void run_main_screen(void)
             char motion_status_str[32];
             if (mpu6050_get_status_string(motion_status_str, sizeof(motion_status_str)) == ESP_OK) {
                 display_update_motion_status(motion_status_str);
+            }
+        }
+        
+        // Update Wi-Fi status every 3 seconds (300 * 10ms) for more responsive WiFi status
+        wifi_update_counter++;
+        if (wifi_update_counter >= 300) {
+            wifi_update_counter = 0;
+            
+            char wifi_status_str[32];
+            if (wifi_get_status_string(wifi_status_str, sizeof(wifi_status_str)) == ESP_OK) {
+                display_update_wifi_status(wifi_status_str);
             }
         }
     }

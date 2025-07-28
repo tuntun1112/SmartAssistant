@@ -90,6 +90,13 @@ void display_update_pir_status(const char* pir_status_text);
 void display_update_motion_status(const char* motion_status_text);
 
 /**
+ * @brief Update Wi-Fi status display
+ * 
+ * @param wifi_status_text Wi-Fi status text to display (e.g., "WiFi: Connected" or "WiFi: Connecting...")
+ */
+void display_update_wifi_status(const char* wifi_status_text);
+
+/**
  * @brief Deinitialize the display system and free resources
  * 
  * This function cleans up all resources allocated by the display system:

@@ -106,6 +106,20 @@ extern "C" {
 #define CONFIG_LVGL_UPDATE_PERIOD_MS    5
 
 // =============================================================================
+// Wi-Fi Configuration
+// =============================================================================
+
+#define CONFIG_WIFI_SSID                "DIDI HOME 2.4G For智能居家"
+#define CONFIG_WIFI_PASSWORD            "19411460"
+#define CONFIG_WIFI_MAXIMUM_RETRY       5           // More retries with adaptive intervals
+#define CONFIG_WIFI_CONNECT_TIMEOUT_MS  15000       // Reduced to 15 seconds
+#define CONFIG_WIFI_TASK_STACK_SIZE     4096
+#define CONFIG_WIFI_TASK_PRIORITY       2           // Lower than sensors but higher than display
+#define CONFIG_WIFI_INITIAL_RETRY_MS    2000        // First retry after 2 seconds
+#define CONFIG_WIFI_MAX_RETRY_MS        10000       // Max retry interval 10 seconds
+#define CONFIG_WIFI_SCAN_TIMEOUT_MS     5000        // Quick scan timeout
+
+// =============================================================================
 // Time Module Configuration  
 // =============================================================================
 

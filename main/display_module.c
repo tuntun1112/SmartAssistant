@@ -73,9 +73,10 @@ static lv_obj_t *date_label = NULL;
 static char current_time_str[16] = "12:34:56";
 static char current_date_str[32] = "Jul 20, 2025";
 
-// PIR sensor status UI component
+// Sensor status UI components
 static lv_obj_t *pir_status_label = NULL;
 static lv_obj_t *motion_status_label = NULL;
+static lv_obj_t *wifi_status_label = NULL;
 
 // Forward declarations
 static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io,
@@ -433,6 +434,13 @@ static void create_main_screen(void)
     lv_obj_add_style(motion_status_label, &style_chinese_font, 0);
     lv_obj_align(motion_status_label, LV_ALIGN_TOP_LEFT, 10, 50);
 
+    // Wi-Fi status (bottom-right corner)
+    wifi_status_label = lv_label_create(main_screen);
+    lv_label_set_text(wifi_status_label, "WiFi: Off");
+    lv_obj_set_style_text_color(wifi_status_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_add_style(wifi_status_label, &style_chinese_font, 0);
+    lv_obj_align(wifi_status_label, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
     // Weather info (top-right)
     lv_obj_t *weather_text = lv_label_create(main_screen);
     lv_label_set_text(weather_text, "21C Rainy");
@@ -468,13 +476,6 @@ static void create_main_screen(void)
     lv_obj_set_style_text_color(assistant_text, lv_color_white(), LV_STATE_DEFAULT);
     lv_obj_add_style(assistant_text, &style_chinese_font, 0);
     lv_obj_align(assistant_text, LV_ALIGN_BOTTOM_LEFT, 10, -10);
-
-    // WiFi status (bottom-right)
-    lv_obj_t *wifi_text = lv_label_create(main_screen);
-    lv_label_set_text(wifi_text, "WiFi: OK");
-    lv_obj_set_style_text_color(wifi_text, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_add_style(wifi_text, &style_chinese_font, 0);
-    lv_obj_align(wifi_text, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     ESP_LOGI(TAG, "Simple main screen created");
 }
@@ -566,7 +567,13 @@ void display_update_time(int hours, int minutes, int seconds)
     if (time_label != NULL) {
         snprintf(current_time_str, sizeof(current_time_str), "%02d:%02d:%02d", hours, minutes, seconds);
         lv_label_set_text(time_label, current_time_str);
-        ESP_LOGI(TAG, "Time updated: %s (label ptr: %p)", current_time_str, time_label);
+        
+        // Only log time display updates on the minute to reduce serial output
+        static int last_logged_minute = -1;
+        if (minutes != last_logged_minute) {
+            ESP_LOGI(TAG, "Time display updated: %02d:%02d", hours, minutes);
+            last_logged_minute = minutes;
+        }
     } else {
         ESP_LOGE(TAG, "Time label is NULL - display may not be properly initialized or main screen not created");
     }
@@ -584,7 +591,13 @@ void display_update_date(int year, int month, int day)
             snprintf(current_date_str, sizeof(current_date_str), "%s %d, %d", 
                      month_names[month-1], day, year);
             lv_label_set_text(date_label, current_date_str);
-            ESP_LOGI(TAG, "Date updated: %s", current_date_str);
+            
+            // Only log date updates when the date actually changes
+            static int last_logged_day = -1;
+            if (day != last_logged_day) {
+                ESP_LOGI(TAG, "Date updated: %s", current_date_str);
+                last_logged_day = day;
+            }
         }
     }
 }
@@ -618,6 +631,16 @@ void display_update_motion_status(const char* motion_status_text)
         ESP_LOGD(TAG, "Motion status updated: %s", motion_status_text);
     } else {
         ESP_LOGW(TAG, "Motion status label is NULL or invalid text provided - main screen may not be initialized");
+    }
+}
+
+void display_update_wifi_status(const char* wifi_status_text)
+{
+    if (wifi_status_label != NULL && wifi_status_text != NULL) {
+        lv_label_set_text(wifi_status_label, wifi_status_text);
+        ESP_LOGD(TAG, "Wi-Fi status updated: %s", wifi_status_text);
+    } else {
+        ESP_LOGW(TAG, "Wi-Fi status label is NULL or invalid text provided - main screen may not be initialized");
     }
 }
 
